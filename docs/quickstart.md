@@ -7,7 +7,7 @@ Get hands-on with A2UI by running the restaurant finder demo. This guide will ha
 By the end of this quickstart, you'll have:
 
 - ✅ A running web app with A2UI Lit renderer
-- ✅ A Gemini-powered agent that generates dynamic UIs
+- ✅ An OpenAI-powered agent that generates dynamic UIs
 - ✅ An interactive restaurant finder with form generation, time selection, and confirmation flows
 - ✅ Understanding of how A2UI messages flow from agent to UI
 
@@ -17,11 +17,11 @@ Before you begin, make sure you have:
 
 - **Node.js** (v18 or later) — [Download here](https://nodejs.org/)
 - **uv** (Python package manager) — [Install here](https://docs.astral.sh/uv/getting-started/installation/) (used to run the Python agent backend)
-- **A Gemini API key** — [Get one free from Google AI Studio](https://aistudio.google.com/apikey)
+- **An OpenAI API key** — [Get one at OpenAI Platform](https://platform.openai.com/api-keys)
 
 > ⚠️ **Security Notice**
 >
-> This demo runs an A2A agent that uses Gemini to generate A2UI responses. The agent has access to your API key and will make requests to Google's Gemini API. Always review agent code before running it in production environments.
+> This demo runs an A2A agent that uses OpenAI to generate A2UI responses. The agent has access to your API key and will make requests to the OpenAI API. Always review agent code before running it in production environments.
 
 ## Step 1: Clone the Repository
 
@@ -32,10 +32,18 @@ cd a2ui
 
 ## Step 2: Set Your API Key
 
-Export your Gemini API key as an environment variable:
+Create a `.env` file in `samples/agent/adk/restaurant_finder/` with your OpenAI API key:
 
 ```bash
-export GEMINI_API_KEY="your_gemini_api_key_here"
+cd samples/agent/adk/restaurant_finder
+cp .env.example .env
+# Edit .env and set: OPENAI_API_KEY=your_openai_api_key_here
+```
+
+Or export it in your shell:
+
+```bash
+export OPENAI_API_KEY="your_openai_api_key_here"
 ```
 
 ## Step 3: Navigate to the Lit Client
@@ -77,7 +85,7 @@ In the web app, try these prompts:
 
 ```
 ┌─────────────┐         ┌──────────────┐         ┌────────────────┐
-│   You Type  │────────>│ A2A Agent    │────────>│  Gemini API    │
+│   You Type  │────────>│ A2A Agent    │────────>│  OpenAI API   │
 │  a Message  │         │  (Python)    │         │  (LLM)         │
 └─────────────┘         └──────────────┘         └────────────────┘
                                │                         │
@@ -100,8 +108,8 @@ In the web app, try these prompts:
 ```
 
 1. **You send a message** via the web UI
-2. **The A2A agent** receives it and sends the conversation to Gemini
-3. **Gemini generates** A2UI JSON messages describing the UI
+2. **The A2A agent** receives it and sends the conversation to OpenAI
+3. **The LLM generates** A2UI JSON messages describing the UI
 4. **The A2A agent streams** these messages back to the web app
 5. **The A2UI renderer** converts them into native web components
 6. **You see the UI** rendered in your browser
@@ -215,9 +223,9 @@ If port 5173 is already in use, the dev server will automatically try the next a
 
 If you see errors about missing API keys:
 
-1. Verify the key is exported: `echo $GEMINI_API_KEY`
-2. Make sure it's a valid Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
-3. Try re-exporting: `export GEMINI_API_KEY="your_key"`
+1. Verify the key is set: `echo $OPENAI_API_KEY` (or check `.env` in `samples/agent/adk/restaurant_finder/`)
+2. Make sure it's a valid OpenAI API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+3. Try re-exporting: `export OPENAI_API_KEY="your_key"`
 
 ### Connection Errors on Startup
 

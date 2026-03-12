@@ -40,13 +40,12 @@ class MissingAPIKeyError(Exception):
 @click.option("--port", default=10002)
 def main(host, port):
   try:
-    # Check for API key only if Vertex AI is not configured
-    if not os.getenv("GOOGLE_GENAI_USE_VERTEXAI") == "TRUE":
-      if not os.getenv("GEMINI_API_KEY"):
-        raise MissingAPIKeyError(
-            "GEMINI_API_KEY environment variable not set and GOOGLE_GENAI_USE_VERTEXAI"
-            " is not TRUE."
-        )
+    # Check for OpenAI API key (used by LiteLLM when LITELLM_MODEL is openai/*)
+    if not os.getenv("OPENAI_API_KEY"):
+      raise MissingAPIKeyError(
+          "OPENAI_API_KEY environment variable is not set. "
+          "Get your API key at: https://platform.openai.com/api-keys"
+      )
 
     base_url = f"http://{host}:{port}"
 

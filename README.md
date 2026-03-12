@@ -120,7 +120,10 @@ The best way to understand A2UI is to run the samples.
 2. **Set your API key:**
 
     ```bash
-    export GEMINI_API_KEY="your_gemini_api_key"
+    # Create .env in restaurant_finder with OPENAI_API_KEY=your_key
+    cd samples/agent/adk/restaurant_finder
+    cp .env.example .env
+    # Edit .env and set OPENAI_API_KEY=your_openai_api_key
     ```
 
 3. **Run the Agent (Backend):**

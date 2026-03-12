@@ -14,9 +14,9 @@ NOTE: [For the rizzcharts app](../../agent/adk/rizzcharts/), you will need Googl
 Here is the quickstart for the restaurant app:
 
 ```bash
-# Set up your Gemini API key
+# Set up your OpenAI API key
 cp ../../agent/adk/restaurant_finder/.env.example ../../agent/adk/restaurant_finder/.env
-# Edit the .env file with your actual API key (do not commit .env)
+# Edit the .env file and set OPENAI_API_KEY=your_key (do not commit .env)
 
 # Start the restaurant app frontend
 npm install 

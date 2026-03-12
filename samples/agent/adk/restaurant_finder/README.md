@@ -6,7 +6,7 @@ This sample uses the Agent Development Kit (ADK) along with the A2A protocol to 
 
 - Python 3.9 or higher
 - [UV](https://docs.astral.sh/uv/)
-- Access to an LLM and API Key
+- [OpenAI API key](https://platform.openai.com/api-keys)
 
 ## Running the Sample
 
@@ -16,12 +16,14 @@ This sample uses the Agent Development Kit (ADK) along with the A2A protocol to 
     cd samples/agent/adk/restaurant_finder
     ```
 
-2. Create an environment file with your API key:
+2. Create an environment file with your OpenAI API key:
 
    ```bash
    cp .env.example .env
-   # Edit .env with your actual API key (do not commit .env)
+   # Edit .env and set OPENAI_API_KEY=your_openai_api_key_here (do not commit .env)
    ```
+
+   To use a different model (e.g. `gpt-4o`), set `LITELLM_MODEL=openai/gpt-4o` in `.env`.
 
 3. Run the agent server:
 
