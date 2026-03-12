@@ -224,7 +224,7 @@ class OrchestratorAgent:
 
         logger.info(f"Created remote agent with description: {description}")
 
-    LITELLM_MODEL = os.getenv("LITELLM_MODEL", "gemini/gemini-2.5-flash")
+    LITELLM_MODEL = os.getenv("LITELLM_MODEL", "openai/gpt-4o-mini")
     agent = LlmAgent(
         model=LiteLlm(model=LITELLM_MODEL),
         name="orchestrator_agent",

@@ -38,21 +38,27 @@ class MissingAPIKeyError(Exception):
 @click.command()
 @click.option("--host", default="localhost", type=str)
 @click.option("--port", default=10002, type=int)
-@click.option("--subagent_urls", multiple=True, type=str, required=True)
+@click.option(
+    "--subagent_urls",
+    multiple=True,
+    type=str,
+    default=("http://localhost:10002",),
+    help="Subagent A2A URLs. For real use run subagents and pass their URLs. Default allows server to start for demo.",
+)
 def main(host, port, subagent_urls):
   try:
     # Check for API key only if Vertex AI is not configured
     if not os.getenv("GOOGLE_GENAI_USE_VERTEXAI") == "TRUE":
-      if not os.getenv("GEMINI_API_KEY"):
+      if not os.getenv("OPENAI_API_KEY") and not os.getenv("GEMINI_API_KEY"):
         raise MissingAPIKeyError(
-            "GEMINI_API_KEY environment variable not set and GOOGLE_GENAI_USE_VERTEXAI"
-            " is not TRUE."
+            "Set OPENAI_API_KEY or GEMINI_API_KEY in .env"
         )
 
     base_url = f"http://{host}:{port}"
 
+    # subagent_urls: for real use run subagents and pass their URLs; default allows server to start for demo
     orchestrator_agent, agent_card = asyncio.run(
-        OrchestratorAgent.build_agent(base_url=base_url, subagent_urls=subagent_urls)
+        OrchestratorAgent.build_agent(base_url=base_url, subagent_urls=list(subagent_urls))
     )
     agent_executor = OrchestratorAgentExecutor(agent=orchestrator_agent)
 
