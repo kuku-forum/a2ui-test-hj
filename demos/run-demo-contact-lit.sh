@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Contact Lookup + Lit Shell. Agent: 10003. Open http://localhost:5173/?app=contacts
+
+set -e
+DEMOS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$DEMOS_ROOT/.." && pwd)"
+source "$DEMOS_ROOT/scripts/load-env.sh"
+
+if [[ -z "$GEMINI_API_KEY" ]]; then
+  echo "Set GEMINI_API_KEY in $DEMOS_ROOT/.env (Contact sample requires Gemini)"
+  exit 1
+fi
+
+cd "$ROOT/samples/agent/adk/contact_lookup"
+uv sync --quiet 2>/dev/null || true
+echo ">>> Starting Contact Agent (port 10003)..."
+uv run . --port 10003 &
+PID=$!
+trap "kill $PID 2>/dev/null" EXIT
+sleep 3
+
+echo ">>> Starting Lit Shell. Open http://localhost:5173/?app=contacts"
+cd "$ROOT/samples/client/lit/shell"
+npm run dev
