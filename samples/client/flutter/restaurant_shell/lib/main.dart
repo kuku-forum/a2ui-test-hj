@@ -204,85 +204,99 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
-          // A2UI surface (agent-generated cards, lists)
-          Expanded(
-            flex: 2,
-            child: ClipRect(
-              child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerLowest,
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: GenUiSurface(
-                  host: _a2uiMessageProcessor,
-                  surfaceId: 'default',
+          // Form: title + input (Lit order)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _config.title,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                 ),
-              ),
-            ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        autofocus: true,
+                        controller: _textController,
+                        decoration: InputDecoration(
+                          hintText: _config.placeholder,
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          filled: true,
+                          fillColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
+                        ),
+                        onSubmitted: _handleSubmitted,
+                        textInputAction: TextInputAction.send,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filled(
+                      onPressed: () =>
+                          _handleSubmitted(_textController.text),
+                      icon: const Icon(Icons.send),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const Divider(height: 1),
-          // Chat messages
+          // Scrollable content: loading or surface + messages (fixes overflow)
           Expanded(
-            flex: 1,
-            child: ClipRect(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: _loading
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                  ? Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CircularProgressIndicator(),
+                            const SizedBox(height: 12),
+                            Text(_loadingText),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const CircularProgressIndicator(),
-                        const SizedBox(height: 12),
-                        Text(_loadingText),
+                        Container(
+                          constraints: const BoxConstraints(minHeight: 120),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerLowest,
+                            border: Border.all(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: GenUiSurface(
+                              host: _a2uiMessageProcessor,
+                              surfaceId: 'default',
+                            ),
+                          ),
+                        ),
+                        if (_messages.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          ..._messages.reversed.map(_buildMessage),
+                        ],
                       ],
                     ),
-                  )
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    reverse: true,
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      return _buildMessage(_messages[index]);
-                    },
-                  ),
-            ),
-          ),
-          const Divider(height: 1),
-          // Input row
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      autofocus: true,
-                      controller: _textController,
-                      decoration: InputDecoration(
-                        hintText: _config.placeholder,
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        filled: true,
-                        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                      ),
-                      onSubmitted: _handleSubmitted,
-                      textInputAction: TextInputAction.send,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: () => _handleSubmitted(_textController.text),
-                    icon: const Icon(Icons.send),
-                  ),
-                ],
-              ),
             ),
           ),
         ],
