@@ -115,7 +115,7 @@ class RestaurantAgent:
 
   def _build_agent(self, use_ui: bool) -> LlmAgent:
     """Builds the LLM agent for the restaurant agent."""
-    LITELLM_MODEL = os.getenv("LITELLM_MODEL", "openai/gpt-4o-mini")
+    LITELLM_MODEL = os.getenv("LITELLM_MODEL", "openai/gpt-5.4")
 
     instruction = (
         self._schema_manager.generate_system_prompt(

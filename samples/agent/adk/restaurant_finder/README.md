@@ -23,7 +23,7 @@ This sample uses the Agent Development Kit (ADK) along with the A2A protocol to 
    # Edit .env and set OPENAI_API_KEY=your_openai_api_key_here (do not commit .env)
    ```
 
-   To use a different model (e.g. `gpt-4o`), set `LITELLM_MODEL=openai/gpt-4o` in `.env`.
+   To use a different model (e.g. `gpt-4o`), set `LITELLM_MODEL=openai/gpt-4o` in `.env`. Default is `openai/gpt-5.4`.
 
 3. Run the agent server:
 
