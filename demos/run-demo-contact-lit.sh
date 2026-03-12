@@ -7,8 +7,8 @@ ROOT="$(cd "$DEMOS_ROOT/.." && pwd)"
 source "$DEMOS_ROOT/scripts/load-env.sh"
 mkdir -p "$DEMOS_ROOT/logs"
 
-if [[ -z "$GEMINI_API_KEY" ]]; then
-  echo "Set GEMINI_API_KEY in $DEMOS_ROOT/.env (Contact sample requires Gemini)"
+if [[ -z "$OPENAI_API_KEY" && -z "$GEMINI_API_KEY" ]] || [[ "$OPENAI_API_KEY" == *"your_openai"* ]]; then
+  echo "Set OPENAI_API_KEY or GEMINI_API_KEY in $DEMOS_ROOT/.env"
   exit 1
 fi
 
