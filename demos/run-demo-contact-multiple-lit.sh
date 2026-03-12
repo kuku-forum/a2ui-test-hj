@@ -5,6 +5,7 @@ set -e
 DEMOS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$DEMOS_ROOT/.." && pwd)"
 source "$DEMOS_ROOT/scripts/load-env.sh"
+mkdir -p "$DEMOS_ROOT/logs"
 
 if [[ -z "$GEMINI_API_KEY" ]]; then
   echo "Set GEMINI_API_KEY in $DEMOS_ROOT/.env"
@@ -13,13 +14,13 @@ fi
 
 cd "$ROOT/samples/agent/adk/contact_multiple_surfaces"
 uv sync --quiet 2>/dev/null || true
-echo ">>> Starting Contact Multiple Surfaces Agent (port 10004)..."
-uv run . --port 10004 &
+echo ">>> Starting Contact Multiple Agent (port 10004). Log: $DEMOS_ROOT/logs/contact-multiple-lit-agent.log"
+uv run . --port 10004 2>&1 | tee "$DEMOS_ROOT/logs/contact-multiple-lit-agent.log" &
 PID=$!
 trap "kill $PID 2>/dev/null" EXIT
 sleep 3
 
-echo ">>> Starting Lit Contact client (connects to 10004)..."
+echo ">>> Starting Lit Contact client. Log: $DEMOS_ROOT/logs/contact-multiple-lit-client.log"
 cd "$ROOT/samples/client/lit/contact"
 npm install --quiet 2>/dev/null || true
-npm run dev
+npm run dev 2>&1 | tee "$DEMOS_ROOT/logs/contact-multiple-lit-client.log"
