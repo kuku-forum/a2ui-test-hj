@@ -101,3 +101,14 @@ cd demos
 - **동작 확인**: 에이전트 포트(10002 등) + 클라이언트 URL(5173, 5003 등)로 브라우저에서 확인.
 
 이렇게 하면 수정 없이 제공된 샘플들을 그대로 돌려보며 A2UI 동작을 확인할 수 있습니다.
+
+## 7. 검증 (2025-03-12)
+
+다음이 적용된 상태에서 데모 스크립트 동작을 확인했습니다.
+
+- **실행 권한**: `run-demo-*.sh`, `scripts/*.sh` 실행 가능
+- **클라이언트 의존성**: Node 클라이언트 데모에서 `npm install` 후 `npm run dev`/`npm run start` 실행
+- **포트 충돌**: 에이전트 기동 전 해당 포트 사용 여부 확인, 사용 중이면 안내 메시지 후 종료
+- **OpenAI 단일 키**: 모든 데모가 `OPENAI_API_KEY`만으로 실행 가능 (Contact/Rizzcharts/Orchestrator는 `GEMINI_API_KEY` 선택)
+
+전체 데모를 한 번씩 실행하려면 `demos/.env`에 `OPENAI_API_KEY`를 설정한 뒤, 각 데모마다 `./run-demo.sh <이름>`으로 실행해 보면 됩니다. Flutter 데모는 Flutter SDK가 필요합니다.
