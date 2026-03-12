@@ -18,24 +18,55 @@ void main() {
   runApp(const RestaurantShellApp());
 }
 
-class RestaurantShellApp extends StatelessWidget {
+class RestaurantShellApp extends StatefulWidget {
   const RestaurantShellApp({super.key});
+
+  @override
+  State<RestaurantShellApp> createState() => _RestaurantShellAppState();
+}
+
+class _RestaurantShellAppState extends State<RestaurantShellApp> {
+  ThemeMode _themeMode = ThemeMode.dark;
+
+  static final ThemeData _lightTheme = ThemeData(
+    useMaterial3: true,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: Colors.deepPurple,
+      brightness: Brightness.light,
+    ),
+  );
+
+  static final ThemeData _darkTheme = ThemeData(
+    useMaterial3: true,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: Colors.deepPurple,
+      brightness: Brightness.dark,
+    ),
+  );
+
+  void _toggleTheme() {
+    setState(() {
+      _themeMode =
+          _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'A2UI Shell',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const ChatScreen(),
+      theme: _lightTheme,
+      darkTheme: _darkTheme,
+      themeMode: _themeMode,
+      home: ChatScreen(onToggleTheme: _toggleTheme),
     );
   }
 }
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  const ChatScreen({super.key, this.onToggleTheme});
+
+  final VoidCallback? onToggleTheme;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -145,6 +176,20 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Text(_config.title),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         elevation: 0,
+        actions: [
+          if (widget.onToggleTheme != null)
+            IconButton(
+              onPressed: widget.onToggleTheme,
+              icon: Icon(
+                Theme.of(context).brightness == Brightness.dark
+                    ? Icons.light_mode
+                    : Icons.dark_mode,
+              ),
+              tooltip: Theme.of(context).brightness == Brightness.dark
+                  ? 'Switch to light'
+                  : 'Switch to dark',
+            ),
+        ],
       ),
       body: Column(
         children: [
