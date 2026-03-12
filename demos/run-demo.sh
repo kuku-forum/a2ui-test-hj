@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Run a demo by name. Usage: ./run-demo.sh <name>
-# Names: restaurant-lit | restaurant-react | restaurant-angular | contact-lit | contact-angular |
-#        contact-multiple-lit | rizzcharts-angular | orchestrator-angular | component-gallery-lit
+# Names: restaurant-lit | restaurant-react | restaurant-angular | restaurant-flutter | contact-lit | ...
 
 set -e
 DEMOS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -17,13 +16,15 @@ case "$name" in
   rizzcharts-angular)    "$DEMOS_ROOT/run-demo-rizzcharts-angular.sh" ;;
   orchestrator-angular)  "$DEMOS_ROOT/run-demo-orchestrator-angular.sh" ;;
   component-gallery-lit) "$DEMOS_ROOT/run-demo-component-gallery-lit.sh" ;;
+  restaurant-flutter)         "$DEMOS_ROOT/run-demo-restaurant-flutter.sh" ;;
   *)
     echo "Usage: $0 <demo-name>"
     echo ""
     echo "Demo names:"
-    echo "  restaurant-lit         Restaurant + Lit Shell (port 5173)"
-    echo "  restaurant-react       Restaurant + React Shell (port 5003)"
-    echo "  restaurant-angular     Restaurant + Angular"
+    echo "  restaurant-lit           Restaurant + Lit Shell (port 5173)"
+    echo "  restaurant-react         Restaurant + React Shell (port 5003)"
+    echo "  restaurant-angular       Restaurant + Angular"
+    echo "  restaurant-flutter       Restaurant + Flutter (Lit-style chat + A2UI, web/Android)"
     echo "  contact-lit            Contact + Lit Shell (?app=contacts)"
     echo "  contact-angular       Contact + Angular"
     echo "  contact-multiple-lit   Contact Multiple Surfaces + Lit contact"

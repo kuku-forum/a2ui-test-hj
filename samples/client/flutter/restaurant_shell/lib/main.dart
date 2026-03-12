@@ -3,6 +3,7 @@
 // A2UI Restaurant Finder - Flutter client. Same UX as Lit shell: chat input + A2UI surface.
 // Connects to Restaurant Finder agent at http://localhost:10002 (override with AGENT_URL).
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:genui/genui.dart';
 import 'package:genui_a2ui/genui_a2ui.dart';
@@ -82,6 +83,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _messages = [];
   bool _loading = false;
   AppConfig _config = restaurantConfig;
+  String? _agentConnectionError;
 
   void _clearLoading() {
     if (mounted && _loading) {
@@ -101,6 +103,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _contentGenerator.textResponseStream.listen((String text) {
       if (mounted) {
         setState(() {
+          _agentConnectionError = null;
           _messages.insert(0, AiTextMessage.text(text));
           _loading = false;
         });
@@ -109,7 +112,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
     _contentGenerator.errorStream.listen((ContentGeneratorError error) {
       if (mounted) {
+        final msg = error.error.toString();
+        final isNetwork = msg.contains('Failed to fetch') ||
+            msg.contains('ClientException') ||
+            msg.contains('Connection refused');
         setState(() {
+          _agentConnectionError = isNetwork ? msg : null;
           _messages.insert(
             0,
             AiTextMessage.text('Error: ${error.error}'),
@@ -127,6 +135,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _config = next;
       _messages.clear();
       _loading = false;
+      _agentConnectionError = null;
     });
     _initClient();
   }
@@ -204,6 +213,8 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
+          // Agent unreachable hint (e.g. only "flutter run" without agent)
+          if (_agentConnectionError != null) _buildAgentUnreachableBanner(),
           // Hero image (Restaurant config only, Lit parity)
           if (_config.heroImage != null) _buildHero(),
           // Form: title + input (Lit order)
@@ -249,6 +260,8 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ],
                 ),
+                // Clickable example prompts (one-tap demo)
+                _buildExampleChips(),
               ],
             ),
           ),
@@ -306,30 +319,125 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  List<String> get _examplePrompts {
+    if (_config.key == 'restaurant') {
+      return [
+        'Top 5 Chinese restaurants in New York.',
+        'Best Italian restaurants in NYC',
+        '맛집 추천해줘, Top 5 Chinese in NYC',
+      ];
+    }
+    return ['Alex Jordan', 'Find contact: Jane'];
+  }
+
+  Widget _buildExampleChips() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Try:',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _examplePrompts
+                .map(
+                  (text) => ActionChip(
+                    label: Text(text, style: const TextStyle(fontSize: 13)),
+                    onPressed: () => _handleSubmitted(text),
+                  ),
+                )
+                .toList(),
+          ),
+          if (_config.key == 'restaurant') ...[
+            const SizedBox(height: 8),
+            Text(
+              'Then tap "Book Now" on a restaurant to reserve.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.outline,
+                    fontStyle: FontStyle.italic,
+                  ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAgentUnreachableBanner() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.error,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '에이전트에 연결할 수 없습니다.',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.onErrorContainer,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '목록/이미지를 보려면 에이전트를 먼저 실행하세요:\n'
+            'demos/run-demo.sh restaurant-flutter',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onErrorContainer,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHero() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final path = isDark
         ? (_config.heroImageDark ?? _config.heroImage)!
         : _config.heroImage!;
+    // On web, load from web/ folder (hero.png, hero-dark.png) to avoid asset bundle issues
+    final ImageProvider imageProvider = kIsWeb
+        ? NetworkImage(Uri.base.resolve(path.replaceFirst('assets/', '')).toString())
+        : AssetImage(path) as ImageProvider;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.asset(
-          path,
+        child: Image(
+          image: imageProvider,
           height: 160,
           width: double.infinity,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
-            height: 160,
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            alignment: Alignment.center,
-            child: Icon(
-              Icons.restaurant,
-              size: 48,
-              color: Theme.of(context).colorScheme.outline,
+          errorBuilder: (context, error, stackTrace) => Container(
+              height: 160,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.restaurant,
+                size: 48,
+                color: Theme.of(context).colorScheme.outline,
+              ),
             ),
-          ),
         ),
       ),
     );

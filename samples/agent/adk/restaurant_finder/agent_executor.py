@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import logging
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -82,9 +83,21 @@ class RestaurantAgentExecutor(AgentExecutor):
             logger.info(f"  Part {i}: DataPart (data: {part.root.data})")
         elif isinstance(part.root, TextPart):
           logger.info(f"  Part {i}: TextPart (text: {part.root.text})")
+          # Flutter renderer may send userAction wrapped as a JSON string in TextPart.
+          if not ui_event_part:
+            try:
+              parsed = json.loads(part.root.text)
+              if isinstance(parsed, dict) and "userAction" in parsed:
+                ui_event_part = parsed["userAction"]
+                logger.info(
+                    f"  Part {i}: Extracted userAction from TextPart JSON payload."
+                )
+            except Exception:
+              pass
         else:
           logger.info(f"  Part {i}: Unknown part type ({type(part.root)})")
 
+    book_ctx = {}  # Injected into booking-form dataModelUpdate when action is book_restaurant
     if ui_event_part:
       logger.info(f"Received a2ui ClientEvent: {ui_event_part}")
       action = ui_event_part.get("name") or ui_event_part.get("actionName")
@@ -94,6 +107,11 @@ class RestaurantAgentExecutor(AgentExecutor):
         restaurant_name = ctx.get("restaurantName", "Unknown Restaurant")
         address = ctx.get("address", "Address not provided")
         image_url = ctx.get("imageUrl", "")
+        book_ctx = {
+            "restaurantName": restaurant_name,
+            "address": address,
+            "imageUrl": image_url or "",
+        }
         query = (
             f"USER_WANTS_TO_BOOK: {restaurant_name}, Address: {address}, ImageURL:"
             f" {image_url}"
@@ -142,6 +160,143 @@ class RestaurantAgentExecutor(AgentExecutor):
       )
 
       final_parts = item["parts"]
+
+      # Inject book_ctx (restaurantName, address, imageUrl) into booking-form dataModelUpdate
+      # so the form and restaurant image show correctly (LLM often returns empty values).
+      if book_ctx and action == "book_restaurant":
+        for part in final_parts:
+          if not isinstance(part.root, DataPart):
+            continue
+          data = part.root.data
+          if "dataModelUpdate" not in data:
+            continue
+          dmu = data["dataModelUpdate"]
+          if dmu.get("surfaceId") != "booking-form" or "contents" not in dmu:
+            continue
+          contents = dmu["contents"]
+          if not isinstance(contents, list):
+            continue
+          key_to_value = {
+              "restaurantName": book_ctx.get("restaurantName", ""),
+              "address": book_ctx.get("address", ""),
+              "imageUrl": book_ctx.get("imageUrl", ""),
+          }
+          for entry in contents:
+            if isinstance(entry, dict) and entry.get("key") in key_to_value:
+              entry["valueString"] = key_to_value[entry["key"]]
+          logger.info(
+              "--- Injected book_ctx into booking-form dataModelUpdate: %s ---",
+              book_ctx,
+          )
+          break
+
+      # Normalize booking form for Flutter web stability:
+      # remove free-text dietary input to avoid IME composing assertion in web runtime.
+      if action == "book_restaurant":
+        removed_dietary_component = False
+        removed_dietary_model = False
+        for part in final_parts:
+          if not isinstance(part.root, DataPart):
+            continue
+          data = part.root.data
+
+          if (
+              "surfaceUpdate" in data
+              and data["surfaceUpdate"].get("surfaceId") == "booking-form"
+          ):
+            components = data["surfaceUpdate"].get("components")
+            if isinstance(components, list):
+              # Remove dietary field component.
+              old_count = len(components)
+              components[:] = [
+                  comp
+                  for comp in components
+                  if not (
+                      isinstance(comp, dict)
+                      and comp.get("id") == "dietary-field"
+                  )
+              ]
+              if len(components) != old_count:
+                removed_dietary_component = True
+
+              for comp in components:
+                if not isinstance(comp, dict):
+                  continue
+                cid = comp.get("id")
+                component = comp.get("component", {})
+                if cid == "booking-form-column":
+                  explicit_list = (
+                      component.get("Column", {})
+                      .get("children", {})
+                      .get("explicitList")
+                  )
+                  if isinstance(explicit_list, list) and "dietary-field" in explicit_list:
+                    explicit_list[:] = [
+                        item for item in explicit_list if item != "dietary-field"
+                    ]
+                    removed_dietary_component = True
+                elif cid == "submit-button":
+                  ctx = (
+                      component.get("Button", {})
+                      .get("action", {})
+                      .get("context")
+                  )
+                  if isinstance(ctx, list):
+                    old_ctx_count = len(ctx)
+                    ctx[:] = [
+                        item
+                        for item in ctx
+                        if not (
+                            isinstance(item, dict)
+                            and item.get("key") == "dietary"
+                        )
+                    ]
+                    if len(ctx) != old_ctx_count:
+                      removed_dietary_component = True
+
+          if (
+              "dataModelUpdate" in data
+              and data["dataModelUpdate"].get("surfaceId") == "booking-form"
+          ):
+            contents = data["dataModelUpdate"].get("contents")
+            if isinstance(contents, list):
+              old_contents_count = len(contents)
+              contents[:] = [
+                  item
+                  for item in contents
+                  if not (
+                      isinstance(item, dict)
+                      and item.get("key") == "dietary"
+                  )
+              ]
+              if len(contents) != old_contents_count:
+                removed_dietary_model = True
+
+      # Flutter sample currently renders only surfaceId='default'.
+      # Normalize booking/confirmation surfaces so Book Now/Submit update the visible surface.
+      remap_candidates = set()
+      if action == "book_restaurant":
+        remap_candidates.add("booking-form")
+      elif action == "submit_booking":
+        # Model may emit either "confirmation" or "booking-confirmation".
+        remap_candidates.update(["confirmation", "booking-confirmation"])
+      if remap_candidates:
+        for part in final_parts:
+          if not isinstance(part.root, DataPart):
+            continue
+          data = part.root.data
+          if "beginRendering" in data:
+            sid = data["beginRendering"].get("surfaceId")
+            if sid in remap_candidates:
+              data["beginRendering"]["surfaceId"] = "default"
+          if "surfaceUpdate" in data:
+            sid = data["surfaceUpdate"].get("surfaceId")
+            if sid in remap_candidates:
+              data["surfaceUpdate"]["surfaceId"] = "default"
+          if "dataModelUpdate" in data:
+            sid = data["dataModelUpdate"].get("surfaceId")
+            if sid in remap_candidates:
+              data["dataModelUpdate"]["surfaceId"] = "default"
 
       logger.info("--- FINAL PARTS TO BE SENT ---")
       for i, part in enumerate(final_parts):

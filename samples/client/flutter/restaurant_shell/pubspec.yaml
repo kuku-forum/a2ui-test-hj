@@ -25,3 +25,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+    - assets/hero.png
+    - assets/hero-dark.png
