@@ -1,5 +1,9 @@
 # A2UI Restaurant Finder - Flutter client (Lit-style chat + A2UI surface).
 # Run with: flutter run -d chrome (or -d ios, -d android)
+# 학습 포인트:
+# - `genui`/`genui_a2ui` 조합이 "A2UI JSON -> Flutter 위젯" 렌더링 핵심이다.
+# - 에이전트 URL 기본값은 코드(`lib/config/app_config.dart`)에 있고,
+#   Android 에뮬레이터는 런타임 `--dart-define=AGENT_URL=...`로 덮어쓴다.
 name: restaurant_shell
 description: A2UI Restaurant Finder client for Flutter. Chat input + A2UI rendering (web, iOS, Android).
 publish_to: none

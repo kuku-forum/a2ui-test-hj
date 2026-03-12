@@ -48,6 +48,13 @@ class MissingAPIKeyError(Exception):
 @click.option("--host", default="localhost")
 @click.option("--port", default=10002)
 def main(host, port):
+  """Rizzcharts A2A 서버 진입점.
+
+  학습 포인트:
+  - 기본 catalog + rizzcharts 전용 catalog를 함께 로드한다.
+  - A2UI enabled/catalog/examples provider를 executor/agent 양쪽에 연결해
+    툴 호출 시 클라이언트 capability에 맞는 JSON 전송을 보장한다.
+  """
   try:
     # Check for API key only if Vertex AI is not configured
     if not os.getenv("GOOGLE_GENAI_USE_VERTEXAI") == "TRUE":

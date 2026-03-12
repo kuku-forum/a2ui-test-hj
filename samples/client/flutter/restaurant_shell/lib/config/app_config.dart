@@ -3,6 +3,7 @@
 // App config for Restaurant Finder and Contact Manager (Lit shell parity).
 
 class AppConfig {
+  /// 앱 전환(restaurant/contacts) 시 사용하는 최소 실행 설정 묶음.
   const AppConfig({
     required this.key,
     required this.title,

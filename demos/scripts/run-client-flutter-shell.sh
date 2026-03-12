@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Run only the Flutter Restaurant Shell client. Use in terminal 2; start agent first in terminal 1 (e.g. ./scripts/run-agent-restaurant.sh).
 # Expects Restaurant Finder agent on http://localhost:10002.
+#
+# 학습 포인트:
+# - Android 에뮬레이터는 host localhost를 직접 보지 못하므로 10.0.2.2를 사용한다.
+# - "화면은 뜨는데 데이터가 안 보임" 문제는 대개 AGENT_URL/디바이스 매핑 이슈다.
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Run a demo by name. Usage: ./run-demo.sh <name>
 # Names: restaurant-lit | restaurant-react | restaurant-angular | restaurant-flutter | contact-lit | ...
+#
+# 학습 포인트:
+# - 이 파일은 "실제 실행 로직"이 아니라 "데모 이름 -> 개별 스크립트" 라우터다.
+# - 디버깅할 때는 여기서 어떤 스크립트로 분기되는지 먼저 확인하면 빠르다.
 
 set -e
 DEMOS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

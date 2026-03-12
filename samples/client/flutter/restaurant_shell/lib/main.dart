@@ -20,6 +20,7 @@ void main() {
 }
 
 class RestaurantShellApp extends StatefulWidget {
+  /// 앱 전체 테마(다크/라이트)와 홈 스크린을 관리하는 루트 위젯.
   const RestaurantShellApp({super.key});
 
   @override
@@ -65,6 +66,10 @@ class _RestaurantShellAppState extends State<RestaurantShellApp> {
 }
 
 class ChatScreen extends StatefulWidget {
+  /// 실제 학습의 중심 화면.
+  ///
+  /// 입력 텍스트를 에이전트로 보내고, A2UI surface(`default`)와
+  /// 텍스트 메시지 히스토리를 함께 보여준다.
   const ChatScreen({super.key, this.onToggleTheme});
 
   final VoidCallback? onToggleTheme;
@@ -92,6 +97,10 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _initClient() {
+    // 학습 포인트:
+    // - A2uiContentGenerator: 서버 통신 담당
+    // - A2uiMessageProcessor: A2UI part를 surface 상태로 반영
+    // - GenUiConversation: 사용자 메시지 <-> generator 연결
     _contentGenerator = A2uiContentGenerator(
       serverUrl: Uri.parse(_config.serverUrl),
     );
@@ -129,6 +138,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _switchConfig(AppConfig next) {
+    // 앱 전환(restaurant <-> contacts) 시 이전 conversation/client를 정리하고 재초기화한다.
     _conversation.dispose();
     _contentGenerator.dispose();
     setState(() {
@@ -172,7 +182,8 @@ class _ChatScreenState extends State<ChatScreen> {
       _messages.insert(0, UserMessage.text(trimmed));
       _loading = true;
     });
-    // Agent may send only A2UI (no text). Fallback: stop loading after 2s so spinner doesn't spin forever.
+    // Agent가 텍스트 없이 A2UI만 보내는 경우를 대비한 로딩 가드.
+    // (중간 이벤트가 늦을 때 spinner 무한 회전을 방지)
     Future.delayed(const Duration(seconds: 2), _clearLoading);
     _conversation.sendRequest(UserMessage.text(trimmed));
   }
@@ -213,7 +224,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
-          // Agent unreachable hint (e.g. only "flutter run" without agent)
+          // Agent unreachable hint (예: Flutter만 실행하고 agent를 안 띄운 경우)
           if (_agentConnectionError != null) _buildAgentUnreachableBanner(),
           // Hero image (Restaurant config only, Lit parity)
           if (_config.heroImage != null) _buildHero(),
@@ -265,7 +276,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
-          // Scrollable content: loading or surface + messages (fixes overflow)
+          // Scrollable content: loading or surface + messages (overflow 방지)
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -415,7 +426,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final path = isDark
         ? (_config.heroImageDark ?? _config.heroImage)!
         : _config.heroImage!;
-    // On web, load from web/ folder (hero.png, hero-dark.png) to avoid asset bundle issues
+    // 웹에서는 web/ 경로로 로드해 asset bundle 이슈를 피한다.
     final ImageProvider imageProvider = kIsWeb
         ? NetworkImage(Uri.base.resolve(path.replaceFirst('assets/', '')).toString())
         : AssetImage(path) as ImageProvider;

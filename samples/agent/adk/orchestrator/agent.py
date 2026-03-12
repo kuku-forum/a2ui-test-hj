@@ -54,7 +54,12 @@ class A2UIMetadataInterceptor(ClientCallInterceptor):
       agent_card: AgentCard | None,
       context: ClientCallContext | None,
   ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Enables the A2UI extension header and adds A2UI client capabilities to remote agent message metadata."""
+    """Remote subagent 호출에 A2UI 확장/능력 정보를 실어 보내는 인터셉터.
+
+    `context.state["use_ui"] == True`인 경우:
+    - HTTP extension header 추가
+    - message.metadata에 client capabilities 추가
+    """
     logger.info(
         "Intercepting client call to method: "
         + method_name
@@ -91,14 +96,14 @@ class A2AClientFactoryWithA2UIMetadata(A2AClientFactory):
       consumers: list[Consumer] | None = None,
       interceptors: list[ClientCallInterceptor] | None = None,
   ) -> Client:
-    # Add A2UI metadata interceptor
+    # 기본 인터셉터 체인 뒤에 A2UI 메타데이터 인터셉터를 항상 붙인다.
     return super().create(
         card, consumers, (interceptors or []) + [A2UIMetadataInterceptor()]
     )
 
 
 class OrchestratorAgent:
-  """An agent that runs an ecommerce dashboard"""
+  """여러 remote A2A subagent로 요청을 분배하는 상위 에이전트."""
 
   SUPPORTED_CONTENT_TYPES = ["text", "text/plain"]
 
@@ -108,6 +113,13 @@ class OrchestratorAgent:
       callback_context: CallbackContext,
       llm_request: LlmRequest,
   ) -> LlmResponse:
+    """`userAction.surfaceId` 기준으로 대상 subagent로 강제 라우팅한다.
+
+    배경:
+    - 버튼 클릭/폼 제출 이벤트는 surfaceId를 포함한다.
+    - surfaceId를 만든 subagent를 세션에 기록해 두면,
+      LLM 추론 없이도 같은 subagent로 안전하게 라우팅할 수 있다.
+    """
     if (
         llm_request.contents
         and (last_content := llm_request.contents[-1]).parts
@@ -148,7 +160,14 @@ class OrchestratorAgent:
   async def build_agent(
       cls, base_url: str, subagent_urls: List[str]
   ) -> (LlmAgent, AgentCard):
-    """Builds the LLM agent for the orchestrator_agent agent."""
+    """Orchestrator LlmAgent와 AgentCard를 구성한다.
+
+    처리 단계:
+    1) subagent URL별로 agent card를 조회
+    2) A2UI extension capability(지원 catalog 등)를 합집합으로 수집
+    3) RemoteA2aAgent를 생성해 `sub_agents`에 연결
+    4) orchestrator 자체 AgentCard를 구성해 서버에 노출
+    """
 
     subagents = []
     supported_catalog_ids = set()
@@ -178,14 +197,14 @@ class OrchestratorAgent:
             + subagent_card.model_dump_json(indent=2, exclude_none=True)
         )
 
-        # clean name for adk
+        # ADK 제약에 맞는 안전한 이름으로 정규화
         clean_name = re.sub(r"[^0-9a-zA-Z_]+", "_", subagent_card.name)
         if clean_name == "":
           clean_name = "_"
         if clean_name[0].isdigit():
           clean_name = f"_{clean_name}"
 
-        # make remote agent
+        # remote subagent 생성
         description = json.dumps(
             {
                 "id": clean_name,

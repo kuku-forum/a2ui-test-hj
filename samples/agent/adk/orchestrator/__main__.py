@@ -42,10 +42,16 @@ class MissingAPIKeyError(Exception):
     "--subagent_urls",
     multiple=True,
     type=str,
-    default=("http://localhost:10002",),
-    help="Subagent A2A URLs. For real use run subagents and pass their URLs. Default allows server to start for demo.",
+    default=(),
+    help="Subagent A2A URLs. With no URLs the server starts with no subagents. To route to agents, run them (e.g. restaurant on 10003) and pass --subagent_urls http://localhost:10003",
 )
 def main(host, port, subagent_urls):
+  """Orchestrator A2A 서버 실행 진입점.
+
+  학습 포인트:
+  - `--subagent_urls`를 넘기면 실제 remote subagent를 연결해 라우팅한다.
+  - URL을 안 넘겨도 서버는 부팅되지만, 실제 위임 대상이 없으면 라우팅 이점은 줄어든다.
+  """
   try:
     # Check for API key only if Vertex AI is not configured
     if not os.getenv("GOOGLE_GENAI_USE_VERTEXAI") == "TRUE":
@@ -56,7 +62,8 @@ def main(host, port, subagent_urls):
 
     base_url = f"http://{host}:{port}"
 
-    # subagent_urls: for real use run subagents and pass their URLs; default allows server to start for demo
+    # 실사용에서는 subagent 서버를 띄운 뒤 URL을 전달하는 것이 핵심이다.
+    # 데모 편의를 위해 URL이 비어도 서버 자체는 기동되도록 둔다.
     orchestrator_agent, agent_card = asyncio.run(
         OrchestratorAgent.build_agent(base_url=base_url, subagent_urls=list(subagent_urls))
     )
