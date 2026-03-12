@@ -1,0 +1,27 @@
+# A2UI Restaurant Finder - Flutter client (Lit-style chat + A2UI surface).
+# Run with: flutter run -d chrome (or -d ios, -d android)
+name: restaurant_shell
+description: A2UI Restaurant Finder client for Flutter. Chat input + A2UI rendering (web, iOS, Android).
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+  flutter: ">=3.35.7 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  genui: ^0.7.0
+  genui_a2ui: ^0.7.0
+  logging: ^1.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
