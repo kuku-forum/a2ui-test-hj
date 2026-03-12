@@ -204,6 +204,8 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
+          // Hero image (Restaurant config only, Lit parity)
+          if (_config.heroImage != null) _buildHero(),
           // Form: title + input (Lit order)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -300,6 +302,35 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHero() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final path = isDark
+        ? (_config.heroImageDark ?? _config.heroImage)!
+        : _config.heroImage!;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.asset(
+          path,
+          height: 160,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            height: 160,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.restaurant,
+              size: 48,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+          ),
+        ),
       ),
     );
   }
