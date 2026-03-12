@@ -22,4 +22,5 @@ sleep 3
 
 echo ">>> Starting Angular (restaurant). Log: $DEMOS_ROOT/logs/restaurant-angular-client.log"
 cd "$ROOT/samples/client/angular"
+npm install --quiet 2>/dev/null || true
 npm run start -- restaurant 2>&1 | tee "$DEMOS_ROOT/logs/restaurant-angular-client.log"

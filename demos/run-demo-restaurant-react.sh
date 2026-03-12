@@ -22,4 +22,5 @@ sleep 3
 
 echo ">>> Starting React Shell. Log: $DEMOS_ROOT/logs/restaurant-react-client.log"
 cd "$ROOT/samples/client/react/shell"
+npm install --quiet 2>/dev/null || true
 npm run dev 2>&1 | tee "$DEMOS_ROOT/logs/restaurant-react-client.log"

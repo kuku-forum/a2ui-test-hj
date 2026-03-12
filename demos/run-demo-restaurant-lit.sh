@@ -22,4 +22,5 @@ sleep 3
 
 echo ">>> Starting Lit Shell. Log: $DEMOS_ROOT/logs/restaurant-lit-client.log"
 cd "$ROOT/samples/client/lit/shell"
+npm install --quiet 2>/dev/null || true
 npm run dev 2>&1 | tee "$DEMOS_ROOT/logs/restaurant-lit-client.log"

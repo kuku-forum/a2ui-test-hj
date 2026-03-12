@@ -22,4 +22,5 @@ sleep 3
 
 echo ">>> Starting Angular (rizzcharts). Log: $DEMOS_ROOT/logs/rizzcharts-angular-client.log"
 cd "$ROOT/samples/client/angular"
+npm install --quiet 2>/dev/null || true
 npm run start -- rizzcharts 2>&1 | tee "$DEMOS_ROOT/logs/rizzcharts-angular-client.log"

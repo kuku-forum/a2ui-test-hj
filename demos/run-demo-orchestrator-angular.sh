@@ -22,4 +22,5 @@ sleep 3
 
 echo ">>> Starting Angular (orchestrator). Log: $DEMOS_ROOT/logs/orchestrator-angular-client.log"
 cd "$ROOT/samples/client/angular"
+npm install --quiet 2>/dev/null || true
 npm run start -- orchestrator 2>&1 | tee "$DEMOS_ROOT/logs/orchestrator-angular-client.log"
