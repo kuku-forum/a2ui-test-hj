@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Restaurant Finder + Flutter (Lit-style: chat input + A2UI). Agent: 10002.
 # Web: Chrome. Android: use FLUTTER_DEVICE=android or -d android when run separately.
+#
+# 학습 포인트:
+# - 한 스크립트 안에서 agent/client를 모두 띄운다.
+# - 실패 원인 분리는 어렵지만, "빠르게 전체 동작 확인"에는 가장 편하다.
 
 set -e
 DEMOS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

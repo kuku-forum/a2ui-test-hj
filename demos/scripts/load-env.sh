@@ -2,6 +2,10 @@
 # Source demos/.env and set LITELLM_MODEL from GPT_MODEL or GEMINI_MODEL.
 # Usage: source "$(dirname "${BASH_SOURCE[0]}")/scripts/load-env.sh"   (from demos/)
 #    or: source "$DEMOS_ROOT/scripts/load-env.sh"
+#
+# 학습 포인트:
+# - 우선순위: LITELLM_MODEL 직접 지정 > GPT_MODEL/GEMINI_MODEL 자동 변환
+# - 즉, 모델 디버깅 시 최종적으로 export된 LITELLM_MODEL 값을 확인하는 게 핵심.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEMOS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"

@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Restaurant Finder + Lit Shell. Agent: 10002. Client: http://localhost:5173
+#
+# 학습 포인트:
+# - Flutter보다 의존성이 가벼워 "첫 실행 성공 경험"을 만들기 쉽다.
+# - endpoint/port 확인은 restaurant-flutter와 동일 패턴이다.
 
 set -e
 DEMOS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

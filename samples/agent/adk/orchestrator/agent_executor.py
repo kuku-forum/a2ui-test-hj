@@ -47,7 +47,13 @@ logger = logging.getLogger(__name__)
 
 
 class OrchestratorAgentExecutor(A2aAgentExecutor):
-  """Contact AgentExecutor Example."""
+  """Orchestrator 데모의 A2A executor.
+
+  역할:
+  - ADK 이벤트를 A2A 이벤트로 변환
+  - A2UI surfaceId를 추적해 "어떤 subagent가 그 surface를 만들었는지" 저장
+  - 이후 userAction(surfaceId 기반)을 올바른 subagent로 라우팅할 수 있게 지원
+  """
 
   def __init__(self, agent: LlmAgent):
     config = A2aAgentExecutorConfig(
@@ -75,6 +81,13 @@ class OrchestratorAgentExecutor(A2aAgentExecutor):
       context_id: Optional[str] = None,
       part_converter: part_converter.GenAIPartToA2APartConverter = part_converter.convert_genai_part_to_a2a_part,
   ) -> List[A2AEvent]:
+    """ADK 이벤트를 A2A 이벤트로 변환하고 라우팅 메타데이터를 기록한다.
+
+    학습 포인트:
+    - `event.author`는 현재 응답을 생성한 subagent 이름이다.
+    - A2UI `beginRendering.surfaceId`를 키로 사용해
+      surfaceId -> subagent_name 매핑을 세션에 저장한다.
+    """
     a2a_events = event_converter.convert_event_to_a2a_events(
         event,
         invocation_context,
@@ -84,7 +97,7 @@ class OrchestratorAgentExecutor(A2aAgentExecutor):
     )
 
     for a2a_event in a2a_events:
-      # Try to populate subagent agent card if available.
+      # 가능하면 현재 subagent의 카드 메타데이터를 이벤트에 첨부해 클라이언트가 참고하게 한다.
       subagent_card = None
       if active_subagent_name := event.author:
         # We need to find the subagent by name
@@ -113,6 +126,7 @@ class OrchestratorAgentExecutor(A2aAgentExecutor):
             and (begin_rendering := a2a_part.root.data.get("beginRendering"))
             and (surface_id := begin_rendering.get("surfaceId"))
         ):
+          # surfaceId를 만든 subagent를 저장해 다음 userAction 라우팅에 재사용한다.
           asyncio.run_coroutine_threadsafe(
               SubagentRouteManager.set_route_to_subagent_name(
                   surface_id,
@@ -132,6 +146,7 @@ class OrchestratorAgentExecutor(A2aAgentExecutor):
       run_request: AgentRunRequest,
       runner: Runner,
   ):
+    """세션 초기화 시 A2UI 사용 여부/클라이언트 capability를 상태로 주입한다."""
     session = await super()._prepare_session(context, run_request, runner)
 
     if try_activate_a2ui_extension(context):
@@ -141,6 +156,8 @@ class OrchestratorAgentExecutor(A2aAgentExecutor):
           else None
       )
 
+      # system 상태 델타로 use_ui/client_capabilities를 넣어
+      # remote subagent 호출 시 A2UI 확장 정보 전파에 사용한다.
       await runner.session_service.append_event(
           session,
           Event(

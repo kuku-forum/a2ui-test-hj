@@ -39,7 +39,16 @@ logger = logging.getLogger(__name__)
 
 
 class RestaurantAgentExecutor(AgentExecutor):
-  """Restaurant AgentExecutor Example."""
+  """Restaurant 데모의 A2A 실행 오케스트레이터.
+
+  큰 흐름:
+  1) 클라이언트 메시지에서 텍스트 또는 `userAction` 이벤트를 해석
+  2) UI 확장(A2UI) 활성 여부에 따라 UI/text 에이전트 선택
+  3) 선택된 에이전트의 stream 결과를 Task 상태 이벤트로 전달
+  4) Flutter/Lit 호환을 위한 표면(surface) 보정 로직 적용
+
+  이 클래스는 "비즈니스 로직"보다 "입출력 연결/정규화"가 핵심이다.
+  """
 
   def __init__(self, ui_agent: RestaurantAgent, text_agent: RestaurantAgent):
     # Instantiate two agents: one for UI and one for text-only.
@@ -52,6 +61,20 @@ class RestaurantAgentExecutor(AgentExecutor):
       context: RequestContext,
       event_queue: EventQueue,
   ) -> None:
+    """A2A 요청 1건을 처리하고 Task 이벤트를 순차적으로 발행한다.
+
+    입력:
+    - `context.message.parts`: 텍스트 또는 DataPart(userAction)
+    - `context.requested_extensions`: A2UI extension 활성화 정보
+
+    출력:
+    - working/input_required/completed 상태 이벤트
+    - 최종적으로 agent가 생성한 A2UI/Text parts
+
+    초보자 체크:
+    - 버튼 클릭은 대개 `userAction`으로 들어온다.
+    - 일반 채팅 입력은 `context.get_user_input()` 경로를 탄다.
+    """
     query = ""
     ui_event_part = None
     action = None
@@ -59,7 +82,8 @@ class RestaurantAgentExecutor(AgentExecutor):
     logger.info(f"--- Client requested extensions: {context.requested_extensions} ---")
     use_ui = try_activate_a2ui_extension(context)
 
-    # Determine which agent to use based on whether the a2ui extension is active.
+    # A2UI 확장이 활성화되면 UI JSON 응답을 생성하는 agent를 사용한다.
+    # 아니면 텍스트 응답용 agent를 사용한다.
     if use_ui:
       agent = self.ui_agent
       logger.info("--- AGENT_EXECUTOR: A2UI extension is active. Using UI agent. ---")
@@ -69,6 +93,7 @@ class RestaurantAgentExecutor(AgentExecutor):
           "--- AGENT_EXECUTOR: A2UI extension is not active. Using text agent. ---"
       )
 
+    # 메시지 파트 스캔: DataPart(userAction) 우선, 없으면 TextPart를 사용한다.
     if context.message and context.message.parts:
       logger.info(
           f"--- AGENT_EXECUTOR: Processing {len(context.message.parts)} message"
@@ -83,7 +108,7 @@ class RestaurantAgentExecutor(AgentExecutor):
             logger.info(f"  Part {i}: DataPart (data: {part.root.data})")
         elif isinstance(part.root, TextPart):
           logger.info(f"  Part {i}: TextPart (text: {part.root.text})")
-          # Flutter renderer may send userAction wrapped as a JSON string in TextPart.
+          # Flutter renderer는 일부 경로에서 userAction을 TextPart(JSON 문자열)로 보낼 수 있다.
           if not ui_event_part:
             try:
               parsed = json.loads(part.root.text)
@@ -97,7 +122,9 @@ class RestaurantAgentExecutor(AgentExecutor):
         else:
           logger.info(f"  Part {i}: Unknown part type ({type(part.root)})")
 
-    book_ctx = {}  # Injected into booking-form dataModelUpdate when action is book_restaurant
+    # 예약 폼에 다시 주입할 컨텍스트.
+    # LLM이 빈 값을 내놓는 경우를 보완하기 위한 서버 측 안전장치다.
+    book_ctx = {}
     if ui_event_part:
       logger.info(f"Received a2ui ClientEvent: {ui_event_part}")
       action = ui_event_part.get("name") or ui_event_part.get("actionName")
@@ -153,6 +180,7 @@ class RestaurantAgentExecutor(AgentExecutor):
         )
         continue
 
+      # 예약 제출이면 최종 완료, 그 외에는 다음 입력을 기다린다.
       final_state = (
           TaskState.completed
           if action == "submit_booking"
@@ -161,8 +189,8 @@ class RestaurantAgentExecutor(AgentExecutor):
 
       final_parts = item["parts"]
 
-      # Inject book_ctx (restaurantName, address, imageUrl) into booking-form dataModelUpdate
-      # so the form and restaurant image show correctly (LLM often returns empty values).
+      # book_ctx(restaurantName/address/imageUrl)를 booking-form dataModelUpdate에 주입한다.
+      # 이유: 모델 응답이 빈 값을 포함할 때도 폼/이미지가 안정적으로 렌더되게 하기 위함.
       if book_ctx and action == "book_restaurant":
         for part in final_parts:
           if not isinstance(part.root, DataPart):
@@ -190,8 +218,8 @@ class RestaurantAgentExecutor(AgentExecutor):
           )
           break
 
-      # Normalize booking form for Flutter web stability:
-      # remove free-text dietary input to avoid IME composing assertion in web runtime.
+      # Flutter web 안정성을 위해 dietary 텍스트 입력을 제거한다.
+      # (웹 런타임 IME composing assertion 회피)
       if action == "book_restaurant":
         removed_dietary_component = False
         removed_dietary_model = False
@@ -272,8 +300,8 @@ class RestaurantAgentExecutor(AgentExecutor):
               if len(contents) != old_contents_count:
                 removed_dietary_model = True
 
-      # Flutter sample currently renders only surfaceId='default'.
-      # Normalize booking/confirmation surfaces so Book Now/Submit update the visible surface.
+      # Flutter 샘플은 현재 `surfaceId='default'`만 표시한다.
+      # booking/confirmation surface를 default로 리매핑해 화면 업데이트가 보이도록 맞춘다.
       remap_candidates = set()
       if action == "book_restaurant":
         remap_candidates.add("booking-form")
@@ -317,4 +345,5 @@ class RestaurantAgentExecutor(AgentExecutor):
   async def cancel(
       self, request: RequestContext, event_queue: EventQueue
   ) -> Task | None:
+    """취소는 현재 데모에서 미지원."""
     raise ServerError(error=UnsupportedOperationError())

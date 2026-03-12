@@ -39,6 +39,14 @@ class MissingAPIKeyError(Exception):
 @click.option("--host", default="localhost")
 @click.option("--port", default=10002)
 def main(host, port):
+  """Restaurant Finder A2A 서버 진입점.
+
+  실행 순서:
+  1) API 키 검증
+  2) UI/Text 에이전트 생성
+  3) AgentExecutor + RequestHandler + Starlette 앱 조립
+  4) uvicorn 서버 실행
+  """
   try:
     # Check for OpenAI API key (used by LiteLLM when LITELLM_MODEL is openai/*)
     if not os.getenv("OPENAI_API_KEY"):

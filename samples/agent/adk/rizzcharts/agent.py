@@ -83,7 +83,13 @@ You will also use layout components like `Column` (as the `root`) and `Text` (to
 
 
 class RizzchartsAgent(LlmAgent):
-  """An agent that runs an ecommerce dashboard"""
+  """이커머스 대시보드 질의를 A2UI 시각화로 변환하는 에이전트.
+
+  초보자 관점 핵심:
+  - 사용자의 요청 의도를 차트/지도 중 하나로 분류
+  - 적절한 데이터 툴(`get_sales_data`, `get_store_sales`) 호출
+  - A2UI JSON을 생성해 `send_a2ui_json_to_client` 툴로 전송
+  """
 
   SUPPORTED_CONTENT_TYPES: ClassVar[list[str]] = ["text", "text/plain"]
   base_url: str = ""
@@ -112,6 +118,7 @@ class RizzchartsAgent(LlmAgent):
         a2ui_examples_provider: A provider to retrieve the A2UI examples (str).
     """
 
+    # 스키마 매니저가 role/workflow/ui 설명을 기반으로 system prompt를 조합한다.
     system_instructions = schema_manager.generate_system_prompt(
         role_description=ROLE_DESCRIPTION,
         workflow_description=WORKFLOW_DESCRIPTION,
@@ -149,10 +156,10 @@ class RizzchartsAgent(LlmAgent):
     self._a2ui_examples_provider = a2ui_examples_provider
 
   def get_agent_card(self) -> AgentCard:
-    """Returns the AgentCard defining this agent's metadata and skills.
+    """A2A discovery에 노출할 AgentCard를 반환한다.
 
-    Returns:
-        An AgentCard object.
+    skills/examples를 명시해 오케스트레이터 또는 클라이언트가
+    이 에이전트의 전문 분야를 이해할 수 있게 한다.
     """
     return AgentCard(
         name="Ecommerce Dashboard Agent",

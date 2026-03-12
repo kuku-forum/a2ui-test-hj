@@ -51,7 +51,16 @@ logger = logging.getLogger(__name__)
 
 
 class RestaurantAgent:
-  """An agent that finds restaurants based on user criteria."""
+  """레스토랑 검색/예약 데모를 담당하는 ADK 기반 에이전트.
+
+  핵심 역할:
+  - 사용자 질의를 받아 LLM 호출
+  - 필요 시 A2UI JSON을 생성하고 스키마 검증
+  - 유효한 응답을 A2A 파트로 변환해 executor로 반환
+
+  `use_ui=True`일 때는 A2UI 스키마/예제를 활용해 구조화된 UI 응답을,
+  `use_ui=False`일 때는 텍스트 중심 응답을 생성한다.
+  """
 
   SUPPORTED_CONTENT_TYPES = ["text", "text/plain"]
 
@@ -80,6 +89,7 @@ class RestaurantAgent:
     )
 
   def get_agent_card(self) -> AgentCard:
+    """A2A discovery에 사용되는 AgentCard를 생성한다."""
     capabilities = AgentCapabilities(
         streaming=True,
         extensions=[
@@ -111,10 +121,17 @@ class RestaurantAgent:
     )
 
   def get_processing_message(self) -> str:
+    """중간 진행 상태에서 클라이언트에 노출할 메시지."""
     return "Finding restaurants that match your criteria..."
 
   def _build_agent(self, use_ui: bool) -> LlmAgent:
-    """Builds the LLM agent for the restaurant agent."""
+    """Restaurant LLM 에이전트 인스턴스를 구성한다.
+
+    학습 포인트:
+    - 모델 선택은 `LITELLM_MODEL` 환경변수를 따른다.
+    - UI 모드면 스키마/예제를 포함한 system prompt를 사용한다.
+    - 텍스트 모드면 간단 프롬프트(`get_text_prompt`)를 사용한다.
+    """
     LITELLM_MODEL = os.getenv("LITELLM_MODEL", "openai/gpt-5.4")
 
     instruction = (
@@ -138,6 +155,14 @@ class RestaurantAgent:
     )
 
   async def stream(self, query, session_id) -> AsyncIterable[dict[str, Any]]:
+    """쿼리를 스트리밍 처리하여 중간/최종 이벤트를 yield한다.
+
+    반환 이벤트 형태:
+    - 중간: `{"is_task_complete": False, "updates": "..."}`
+    - 최종: `{"is_task_complete": True, "parts": [...]}`
+
+    UI 모드에서는 모델 출력을 파싱 후 스키마 검증하고, 실패 시 재시도한다.
+    """
     session_state = {"base_url": self.base_url}
 
     session = await self._runner.session_service.get_session(
@@ -155,12 +180,12 @@ class RestaurantAgent:
     elif "base_url" not in session.state:
       session.state["base_url"] = self.base_url
 
-    # --- Begin: UI Validation and Retry Logic ---
+    # --- UI Validation and Retry Logic ---
     max_retries = 1  # Total 2 attempts
     attempt = 0
     current_query_text = query
 
-    # Ensure schema was loaded
+    # 스키마가 준비되지 않았으면 UI 응답을 안전하게 검증할 수 없으므로 에러 텍스트를 반환한다.
     selected_catalog = self._schema_manager.get_selected_catalog()
     if self.use_ui and not selected_catalog.catalog_schema:
       logger.error(
@@ -189,6 +214,7 @@ class RestaurantAgent:
           f"for session {session_id} ---"
       )
 
+      # ADK runner에 전달할 사용자 메시지
       current_message = types.Content(
           role="user", parts=[types.Part.from_text(text=current_query_text)]
       )
@@ -205,10 +231,10 @@ class RestaurantAgent:
             final_response_content = "\n".join(
                 [p.text for p in event.content.parts if p.text]
             )
-          break  # Got the final response, stop consuming events
+          break
         else:
           logger.info(f"Intermediate event: {event}")
-          # Yield intermediate updates on every attempt
+          # 중간 이벤트는 사용자에게 "작업 중" 상태를 보여준다.
           yield {
               "is_task_complete": False,
               "updates": self.get_processing_message(),
@@ -296,7 +322,7 @@ class RestaurantAgent:
         }
         return  # We're done, exit the generator
 
-      # --- If we're here, it means validation failed ---
+      # 여기 도달하면 UI 검증에 실패한 상태다.
 
       if attempt <= max_retries:
         logger.warning(
@@ -312,7 +338,7 @@ class RestaurantAgent:
         )
         # Loop continues...
 
-    # --- If we're here, it means we've exhausted retries ---
+    # 재시도 횟수를 모두 소진하면 텍스트 에러로 안전 종료한다.
     logger.error(
         "--- RestaurantAgent.stream: Max retries exhausted. Sending text-only"
         " error. ---"
@@ -330,4 +356,4 @@ class RestaurantAgent:
             )
         ],
     }
-    # --- End: UI Validation and Retry Logic ---
+    # --- End UI Validation and Retry Logic ---

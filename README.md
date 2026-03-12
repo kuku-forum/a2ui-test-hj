@@ -102,6 +102,9 @@ A2UI is designed to be a lightweight format, but it fits into a larger ecosystem
 
 The best way to understand A2UI is to run the samples.
 
+For a Korean, beginner-focused walkthrough of this repository and demo flow, see:
+- `docs/learning/README.ko.md`
+
 ### Prerequisites
 
 * Node.js (for web clients)
