@@ -78,7 +78,7 @@
           "component": {
             "Image": {
               "url": {
-                "path": "/imageUrl"
+                "path": "imageUrl"
               }
             }
           }
@@ -106,7 +106,7 @@
             "Text": {
               "usageHint": "h3",
               "text": {
-                "path": "/name"
+                "path": "name"
               }
             }
           }
@@ -116,7 +116,7 @@
           "component": {
             "Text": {
               "text": {
-                "path": "/rating"
+                "path": "rating"
               }
             }
           }
@@ -126,7 +126,7 @@
           "component": {
             "Text": {
               "text": {
-                "path": "/detail"
+                "path": "detail"
               }
             }
           }
@@ -136,7 +136,7 @@
           "component": {
             "Text": {
               "text": {
-                "path": "/infoLink"
+                "path": "infoLink"
               }
             }
           }
@@ -153,19 +153,19 @@
                   {
                     "key": "restaurantName",
                     "value": {
-                      "path": "/name"
+                      "path": "name"
                     }
                   },
                   {
                     "key": "imageUrl",
                     "value": {
-                      "path": "/imageUrl"
+                      "path": "imageUrl"
                     }
                   },
                   {
                     "key": "address",
                     "value": {
-                      "path": "/address"
+                      "path": "address"
                     }
                   }
                 ]
