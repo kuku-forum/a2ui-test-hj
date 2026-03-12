@@ -239,10 +239,7 @@ class RestaurantAgentExecutor(AgentExecutor):
               components[:] = [
                   comp
                   for comp in components
-                  if not (
-                      isinstance(comp, dict)
-                      and comp.get("id") == "dietary-field"
-                  )
+                  if not (isinstance(comp, dict) and comp.get("id") == "dietary-field")
               ]
               if len(components) != old_count:
                 removed_dietary_component = True
@@ -258,26 +255,22 @@ class RestaurantAgentExecutor(AgentExecutor):
                       .get("children", {})
                       .get("explicitList")
                   )
-                  if isinstance(explicit_list, list) and "dietary-field" in explicit_list:
+                  if (
+                      isinstance(explicit_list, list)
+                      and "dietary-field" in explicit_list
+                  ):
                     explicit_list[:] = [
                         item for item in explicit_list if item != "dietary-field"
                     ]
                     removed_dietary_component = True
                 elif cid == "submit-button":
-                  ctx = (
-                      component.get("Button", {})
-                      .get("action", {})
-                      .get("context")
-                  )
+                  ctx = component.get("Button", {}).get("action", {}).get("context")
                   if isinstance(ctx, list):
                     old_ctx_count = len(ctx)
                     ctx[:] = [
                         item
                         for item in ctx
-                        if not (
-                            isinstance(item, dict)
-                            and item.get("key") == "dietary"
-                        )
+                        if not (isinstance(item, dict) and item.get("key") == "dietary")
                     ]
                     if len(ctx) != old_ctx_count:
                       removed_dietary_component = True
@@ -292,10 +285,7 @@ class RestaurantAgentExecutor(AgentExecutor):
               contents[:] = [
                   item
                   for item in contents
-                  if not (
-                      isinstance(item, dict)
-                      and item.get("key") == "dietary"
-                  )
+                  if not (isinstance(item, dict) and item.get("key") == "dietary")
               ]
               if len(contents) != old_contents_count:
                 removed_dietary_model = True

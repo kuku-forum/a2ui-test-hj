@@ -43,9 +43,7 @@ def main(host, port):
     # Check for API key only if Vertex AI is not configured
     if not os.getenv("GOOGLE_GENAI_USE_VERTEXAI") == "TRUE":
       if not os.getenv("OPENAI_API_KEY") and not os.getenv("GEMINI_API_KEY"):
-        raise MissingAPIKeyError(
-            "Set OPENAI_API_KEY or GEMINI_API_KEY in .env"
-        )
+        raise MissingAPIKeyError("Set OPENAI_API_KEY or GEMINI_API_KEY in .env")
 
     base_url = f"http://{host}:{port}"
     ui_agent = ContactAgent(base_url=base_url, use_ui=True)
