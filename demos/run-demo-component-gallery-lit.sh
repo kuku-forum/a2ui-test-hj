@@ -10,6 +10,10 @@ mkdir -p "$DEMOS_ROOT/logs"
 
 CG_AGENT="$ROOT/samples/agent/adk/component_gallery"
 if [[ -f "$CG_AGENT/pyproject.toml" ]]; then
+  if lsof -ti:10005 >/dev/null 2>&1; then
+    echo ">>> Port 10005 is in use. Stop the other demo (Ctrl+C there) or run: lsof -ti:10005 | xargs kill"
+    exit 1
+  fi
   cd "$CG_AGENT"
   uv sync --quiet 2>/dev/null || true
   echo ">>> Starting Component Gallery Agent (port 10005). Log: $DEMOS_ROOT/logs/component-gallery-agent.log"

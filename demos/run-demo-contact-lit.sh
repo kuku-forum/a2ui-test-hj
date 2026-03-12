@@ -12,6 +12,11 @@ if [[ -z "$GEMINI_API_KEY" ]]; then
   exit 1
 fi
 
+if lsof -ti:10003 >/dev/null 2>&1; then
+  echo ">>> Port 10003 is in use. Stop the other demo (Ctrl+C there) or run: lsof -ti:10003 | xargs kill"
+  exit 1
+fi
+
 cd "$ROOT/samples/agent/adk/contact_lookup"
 uv sync --quiet 2>/dev/null || true
 echo ">>> Starting Contact Agent (port 10003). Log: $DEMOS_ROOT/logs/contact-lit-agent.log"

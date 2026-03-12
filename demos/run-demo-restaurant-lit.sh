@@ -12,6 +12,11 @@ if [[ -z "$OPENAI_API_KEY" ]] || [[ "$OPENAI_API_KEY" == *"your_openai"* ]]; the
   exit 1
 fi
 
+if lsof -ti:10002 >/dev/null 2>&1; then
+  echo ">>> Port 10002 is in use. Stop the other demo (Ctrl+C there) or run: lsof -ti:10002 | xargs kill"
+  exit 1
+fi
+
 cd "$ROOT/samples/agent/adk/restaurant_finder"
 uv sync --quiet 2>/dev/null || true
 echo ">>> Starting Restaurant Agent (port 10002). Log: $DEMOS_ROOT/logs/restaurant-lit-agent.log"

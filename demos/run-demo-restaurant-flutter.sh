@@ -32,6 +32,11 @@ if ! command -v flutter &>/dev/null; then
   exit 1
 fi
 
+if lsof -ti:10002 >/dev/null 2>&1; then
+  echo ">>> Port 10002 is in use. Stop the other demo (Ctrl+C there) or run: lsof -ti:10002 | xargs kill"
+  exit 1
+fi
+
 # Start agent (log to file and terminal)
 cd "$ROOT/samples/agent/adk/restaurant_finder"
 uv sync --quiet 2>/dev/null || true

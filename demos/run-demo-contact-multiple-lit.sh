@@ -12,6 +12,11 @@ if [[ -z "$GEMINI_API_KEY" ]]; then
   exit 1
 fi
 
+if lsof -ti:10004 >/dev/null 2>&1; then
+  echo ">>> Port 10004 is in use. Stop the other demo (Ctrl+C there) or run: lsof -ti:10004 | xargs kill"
+  exit 1
+fi
+
 cd "$ROOT/samples/agent/adk/contact_multiple_surfaces"
 uv sync --quiet 2>/dev/null || true
 echo ">>> Starting Contact Multiple Agent (port 10004). Log: $DEMOS_ROOT/logs/contact-multiple-lit-agent.log"

@@ -12,6 +12,11 @@ if [[ -z "$GEMINI_API_KEY" ]]; then
   exit 1
 fi
 
+if lsof -ti:10002 >/dev/null 2>&1; then
+  echo ">>> Port 10002 is in use. Stop the other demo (Ctrl+C there) or run: lsof -ti:10002 | xargs kill"
+  exit 1
+fi
+
 cd "$ROOT/samples/agent/adk/orchestrator"
 uv sync --quiet 2>/dev/null || true
 echo ">>> Starting Orchestrator Agent (port 10002). Log: $DEMOS_ROOT/logs/orchestrator-angular-agent.log"
