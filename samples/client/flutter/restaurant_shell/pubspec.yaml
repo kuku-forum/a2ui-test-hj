@@ -25,6 +25,11 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
 
+# genui/genui_a2ui 가 meta <1.18.0 으로 제약하지만, meta 1.18.x 는 하위 호환.
+# 경고("1 package has newer versions incompatible with dependency constraints") 제거용.
+dependency_overrides:
+  meta: ^1.18.0
+
 flutter:
   uses-material-design: true
   assets:

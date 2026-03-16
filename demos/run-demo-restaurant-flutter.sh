@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Restaurant Finder + Flutter (Lit-style: chat input + A2UI). Agent: 10002.
-# Web: Chrome. Android: use FLUTTER_DEVICE=android or -d android when run separately.
+# Web: Chrome. Android: FLUTTER_DEVICE=<기기ID> 로 실행 (기기 ID는 'flutter devices' 참고).
+#   예) FLUTTER_DEVICE=android   → 연결된 첫 번째 Android 기기 자동 감지
+#   예) FLUTTER_DEVICE=RF8XN3J1H2T → 특정 기기 ID 직접 지정
 #
 # 학습 포인트:
 # - 한 스크립트 안에서 agent/client를 모두 띄운다.
@@ -43,16 +45,49 @@ PID=$!
 trap "kill $PID 2>/dev/null" EXIT
 sleep 3
 
+# FLUTTER_DEVICE=android 처럼 generic 이름을 쓰면 실제 기기 ID 를 자동으로 찾고
+# 에뮬레이터면 10.0.2.2, 실물 기기면 호스트 LAN IP 로 AGENT_URL 을 설정한다.
+resolve_device() {
+  DART_DEFINES=""
+  [[ -z "${FLUTTER_DEVICE:-}" ]] && return
+  # generic "android" → 실제 연결 기기 자동 감지
+  if [[ "$FLUTTER_DEVICE" =~ ^[Aa]ndroid$ ]]; then
+    local line
+    line=$(flutter devices 2>/dev/null | grep -iE "android|mobile" | head -1)
+    if [[ -z "$line" ]]; then
+      echo ">>> 연결된 Android 기기가 없습니다. 'flutter devices' 로 확인하세요."
+      flutter devices 2>/dev/null
+      exit 1
+    fi
+    local id
+    id=$(echo "$line" | sed 's/ • /•/g' | awk -F'•' '{print $2}' | xargs)
+    echo ">>> 감지된 기기: $line"
+    echo ">>> 사용할 기기 ID: $id"
+    FLUTTER_DEVICE="$id"
+    if echo "$line" | grep -qi "emulator"; then
+      # 에뮬레이터 → 10.0.2.2 로 호스트 에이전트 접근
+      DART_DEFINES="--dart-define=AGENT_URL=http://10.0.2.2:10002"
+    else
+      # 실물 기기 → 호스트의 LAN IP 자동 계산
+      local host_ip
+      host_ip=$(ip route get 8.8.8.8 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -1)
+      host_ip="${host_ip:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
+      if [[ -n "$host_ip" ]]; then
+        echo ">>> 실물 기기 감지. 에이전트 URL: http://$host_ip:10002"
+        DART_DEFINES="--dart-define=AGENT_URL=http://$host_ip:10002"
+      else
+        echo ">>> WARNING: 호스트 IP 감지 실패. 필요 시 AGENT_URL 을 직접 설정하세요."
+      fi
+    fi
+  fi
+}
+
 # Run Flutter client (web or Android via FLUTTER_DEVICE)
 echo ">>> Starting Flutter Restaurant Shell. Log: $DEMOS_ROOT/logs/restaurant-flutter-client.log"
 cd "$FLUTTER_SHELL"
 flutter pub get
-# On Android emulator, localhost is the emulator; use 10.0.2.2 to reach host.
-DART_DEFINES=""
-if [[ "$FLUTTER_DEVICE" == "android" ]]; then
-  DART_DEFINES="--dart-define=AGENT_URL=http://10.0.2.2:10002"
-fi
-if [[ -n "$FLUTTER_DEVICE" ]]; then
+resolve_device
+if [[ -n "${FLUTTER_DEVICE:-}" ]]; then
   flutter run -d "$FLUTTER_DEVICE" $DART_DEFINES 2>&1 | tee "$DEMOS_ROOT/logs/restaurant-flutter-client.log"
 elif flutter devices 2>/dev/null | grep -q "Chrome"; then
   flutter run -d chrome 2>&1 | tee "$DEMOS_ROOT/logs/restaurant-flutter-client.log"
