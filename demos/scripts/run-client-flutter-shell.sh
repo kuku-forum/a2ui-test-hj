@@ -11,16 +11,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEMOS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT="$(cd "$DEMOS_ROOT/.." && pwd)"
 
-# Resolve Flutter
-resolve_flutter() {
-  if command -v flutter &>/dev/null; then return; fi
-  for dir in "$FLUTTER_ROOT" "$FLUTTER_HOME" "$HOME/flutter" "$HOME/development/flutter" "$HOME/fvm/default" "/opt/flutter" "/usr/local/flutter"; do
-    if [[ -n "$dir" && -x "$dir/bin/flutter" ]]; then export PATH="$dir/bin:$PATH"; return; fi
-  done
-}
-resolve_flutter
+# Flutter SDK 자동 탐색·설치 (없으면 자동 다운로드)
+# shellcheck source=setup-flutter.sh
+source "$SCRIPT_DIR/setup-flutter.sh"
 if ! command -v flutter &>/dev/null; then
-  echo "Flutter SDK required. Set FLUTTER_ROOT or install Flutter."
+  echo "Flutter SDK 설치에 실패했습니다."
+  echo "수동 설치: https://docs.flutter.dev/get-started/install"
+  echo "또는 FLUTTER_ROOT 환경 변수를 SDK 경로로 설정하세요."
   exit 1
 fi
 

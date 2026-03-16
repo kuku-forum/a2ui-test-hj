@@ -19,20 +19,13 @@ if [[ -z "$OPENAI_API_KEY" ]] || [[ "$OPENAI_API_KEY" == *"your_openai"* ]]; the
   exit 1
 fi
 
-resolve_flutter() {
-  if command -v flutter &>/dev/null; then return; fi
-  local dir
-  for dir in "$FLUTTER_ROOT" "$FLUTTER_HOME" "$HOME/flutter" "$HOME/development/flutter" "$HOME/fvm/default" "/opt/flutter" "/usr/local/flutter"; do
-    if [[ -n "$dir" && -x "$dir/bin/flutter" ]]; then
-      export PATH="$dir/bin:$PATH"
-      return
-    fi
-  done
-}
-resolve_flutter
+# Flutter SDK 자동 탐색·설치 (없으면 자동 다운로드)
+# shellcheck source=scripts/setup-flutter.sh
+source "$DEMOS_ROOT/scripts/setup-flutter.sh"
 if ! command -v flutter &>/dev/null; then
-  echo "Flutter SDK is required. Install: https://docs.flutter.dev/get-started/install"
-  echo "Or set FLUTTER_ROOT to your Flutter SDK path."
+  echo "Flutter SDK 설치에 실패했습니다."
+  echo "수동 설치: https://docs.flutter.dev/get-started/install"
+  echo "또는 FLUTTER_ROOT 환경 변수를 SDK 경로로 설정하세요."
   exit 1
 fi
 
