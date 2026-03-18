@@ -14,6 +14,8 @@
 # - "화면은 뜨는데 데이터가 안 보임" 문제는 대개 AGENT_URL/디바이스 매핑 이슈다.
 
 set -e
+# setup-flutter.sh 가 set -euo pipefail 을 전파하므로 미리 초기화
+DART_DEFINES=""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEMOS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ROOT="$(cd "$DEMOS_ROOT/.." && pwd)"

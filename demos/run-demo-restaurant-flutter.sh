@@ -12,6 +12,8 @@
 # - 실패 원인 분리는 어렵지만, "빠르게 전체 동작 확인"에는 가장 편하다.
 
 set -e
+# setup-flutter.sh 가 set -euo pipefail 을 전파하므로 미리 초기화
+DART_DEFINES=""
 DEMOS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$DEMOS_ROOT/.." && pwd)"
 source "$DEMOS_ROOT/scripts/load-env.sh"
@@ -44,9 +46,11 @@ fi
 cd "$ROOT/samples/agent/adk/restaurant_finder"
 uv sync --quiet 2>/dev/null || true
 echo ">>> Starting Restaurant Agent (port 10002). Log: $DEMOS_ROOT/logs/restaurant-agent.log"
-uv run . --port 10002 2>&1 | tee "$DEMOS_ROOT/logs/restaurant-agent.log" &
+echo ">>>   (로그 확인: tail -f $DEMOS_ROOT/logs/restaurant-agent.log)"
+# tee 파이프 대신 직접 리다이렉트: $! 가 uv run 의 PID 를 정확히 가리키게 함
+uv run . --port 10002 > "$DEMOS_ROOT/logs/restaurant-agent.log" 2>&1 &
 PID=$!
-trap "kill $PID 2>/dev/null" EXIT
+trap "kill $PID 2>/dev/null || true" EXIT
 sleep 3
 
 # ── Flutter 디바이스 감지 및 AGENT_URL 설정 ────────────────────────────────────
