@@ -64,6 +64,13 @@ sleep 3
 #
 # String.fromEnvironment 는 컴파일 타임 상수이므로 --dart-define 으로 주입한다.
 
+# adb reverse 두 포트 모두 포워딩. 성공 시 0, 실패(adb 없음·기기 미연결 등) 시 1 반환.
+_adb_reverse() {
+  command -v adb &>/dev/null           || return 1
+  adb reverse tcp:10002 tcp:10002 2>/dev/null || return 1
+  adb reverse tcp:10003 tcp:10003 2>/dev/null || return 1
+}
+
 _set_agent_url() {
   # $1: flutter devices 출력에서 추출한 기기 정보 라인
   local device_line="$1"
@@ -72,12 +79,9 @@ _set_agent_url() {
     agent_host="10.0.2.2"
     echo ">>> 에뮬레이터 감지. 에이전트 URL: http://$agent_host:10002"
   else
-    # adb reverse: 폰에서 localhost:PORT → PC의 PORT 로 포워딩 (Galaxy/실물 기기 권장).
     # adb reverse 성공 → localhost 사용 (가장 안정적).
     # 실패 시 → PC LAN IP로 폴백 (Wi-Fi 같은 네트워크 필요).
-    if command -v adb &>/dev/null && \
-       adb reverse tcp:10002 tcp:10002 2>/dev/null && \
-       adb reverse tcp:10003 tcp:10003 2>/dev/null; then
+    if _adb_reverse; then
       agent_host="localhost"
       echo ">>> [adb reverse] 포트 포워딩 성공 → 폰에서 localhost:10002 사용"
     else
@@ -157,8 +161,12 @@ resolve_device
 
 echo ">>> FLUTTER_DEVICE=$FLUTTER_DEVICE"
 if [[ "$FLUTTER_DEVICE" == "chrome" ]]; then
-  # 웹: localhost 그대로 사용, debug 모드 OK
-  flutter run -d chrome $DART_DEFINES 2>&1 | tee "$LOG"
+  # 웹: web-server 모드로 실행 → Chrome·Edge 등 어떤 브라우저에서도 접속 가능.
+  # VSCode Remote 사용 시 포트 포워딩 후 로컬 브라우저로 접속.
+  WEB_PORT="${FLUTTER_WEB_PORT:-8080}"
+  echo ">>> 웹 서버 모드: http://localhost:$WEB_PORT"
+  echo ">>> Edge·Chrome 등 브라우저에서 위 주소를 여세요."
+  flutter run -d web-server --web-port "$WEB_PORT" $DART_DEFINES 2>&1 | tee "$LOG"
 else
   # 기기: release 모드로 실행 → setFrameRateCategory 로그 없음, 성능 대폭 개선
   echo ">>> 릴리즈 모드로 실행합니다 (debug 대비 성능 대폭 개선)."
