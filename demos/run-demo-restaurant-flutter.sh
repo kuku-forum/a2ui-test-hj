@@ -144,7 +144,14 @@ resolve_device() {
 # ── Flutter 클라이언트 실행 ─────────────────────────────────────────────────────
 echo ">>> Starting Flutter Restaurant Shell. Log: $LOG"
 cd "$FLUTTER_SHELL"
-flutter pub get || { echo ">>> flutter pub get 실패. 위 오류를 확인하세요."; exit 1; }
+# flutter pub get: 출력 캡처 후 meta override 관련 cosmetic 경고 라인만 제거
+_pub_out=$(flutter pub get 2>&1) || {
+  echo "$_pub_out"
+  echo ">>> [ERROR] flutter pub get 실패. 위 오류를 확인하세요."
+  exit 1
+}
+echo "$_pub_out" | grep -vE "(newer versions incompatible|Try.*pub outdated|overridden)" || true
+
 resolve_device
 
 echo ">>> FLUTTER_DEVICE=$FLUTTER_DEVICE"
