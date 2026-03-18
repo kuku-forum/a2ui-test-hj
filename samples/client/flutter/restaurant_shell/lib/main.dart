@@ -3,13 +3,21 @@
 // A2UI Restaurant Finder - Flutter client. Same UX as Lit shell: chat input + A2UI surface.
 // Connects to Restaurant Finder agent at http://localhost:10002 (override with AGENT_URL).
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:genui/genui.dart';
 import 'package:genui_a2ui/genui_a2ui.dart';
 import 'package:logging/logging.dart';
 
 import 'config/app_config.dart';
+
+/// Simple log entry for the in-app debug panel.
+class _LogEntry {
+  final String tag;   // 'SEND' | 'RECV' | 'ERROR'
+  final String body;
+  final DateTime ts;
+
+  _LogEntry(this.tag, this.body) : ts = DateTime.now();
+}
 
 void main() {
   Logger.root.level = Level.INFO;
@@ -86,6 +94,7 @@ class _ChatScreenState extends State<ChatScreen> {
   late A2uiContentGenerator _contentGenerator;
   late GenUiConversation _conversation;
   final List<ChatMessage> _messages = [];
+  final List<_LogEntry> _debugLogs = [];
   bool _loading = false;
   AppConfig _config = restaurantConfig;
   String? _agentConnectionError;
@@ -114,6 +123,7 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           _agentConnectionError = null;
           _messages.insert(0, AiTextMessage.text(text));
+          _debugLogs.insert(0, _LogEntry('RECV', text));
           _loading = false;
         });
       }
@@ -131,6 +141,7 @@ class _ChatScreenState extends State<ChatScreen> {
             0,
             AiTextMessage.text('Error: ${error.error}'),
           );
+          _debugLogs.insert(0, _LogEntry('ERROR', msg));
           _loading = false;
         });
       }
@@ -174,12 +185,143 @@ class _ChatScreenState extends State<ChatScreen> {
     return lt?.toString() ?? 'Loading...';
   }
 
+  void _showDebugPanel() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1e1e1e),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          maxChildSize: 0.95,
+          builder: (_, scrollCtrl) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
+                    children: [
+                      const Text(
+                        'Agent Logs',
+                        style: TextStyle(
+                          color: Color(0xFF4ec9b0),
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          setState(() => _debugLogs.clear());
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text(
+                          'Clear',
+                          style: TextStyle(color: Color(0xFF858585)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(color: Color(0xFF3a3a3a), height: 1),
+                Expanded(
+                  child: _debugLogs.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'No logs yet. Send a message first.',
+                            style: TextStyle(color: Color(0xFF858585)),
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: scrollCtrl,
+                          itemCount: _debugLogs.length,
+                          itemBuilder: (_, i) {
+                            final e = _debugLogs[i];
+                            final tagColor = e.tag == 'SEND'
+                                ? const Color(0xFF9cdcfe)
+                                : e.tag == 'RECV'
+                                    ? const Color(0xFFb5cea8)
+                                    : const Color(0xFFf44747);
+                            final timeStr =
+                                '${e.ts.hour.toString().padLeft(2, '0')}:'
+                                '${e.ts.minute.toString().padLeft(2, '0')}:'
+                                '${e.ts.second.toString().padLeft(2, '0')}';
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 6),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        timeStr,
+                                        style: const TextStyle(
+                                          color: Color(0xFF858585),
+                                          fontSize: 11,
+                                          fontFamily: 'monospace',
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: tagColor.withOpacity(0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          border:
+                                              Border.all(color: tagColor, width: 0.8),
+                                        ),
+                                        child: Text(
+                                          e.tag,
+                                          style: TextStyle(
+                                            color: tagColor,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'monospace',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    e.body,
+                                    style: const TextStyle(
+                                      color: Color(0xFFd4d4d4),
+                                      fontSize: 12,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                  const Divider(
+                                      color: Color(0xFF2a2a2a), height: 16),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _handleSubmitted(String text) {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
     _textController.clear();
     setState(() {
       _messages.insert(0, UserMessage.text(trimmed));
+      _debugLogs.insert(0, _LogEntry('SEND', trimmed));
       _loading = true;
     });
     // Agent가 텍스트 없이 A2UI만 보내는 경우를 대비한 로딩 가드.
@@ -197,6 +339,17 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         elevation: 0,
         actions: [
+          IconButton(
+            onPressed: _showDebugPanel,
+            icon: Badge(
+              isLabelVisible: _debugLogs.isNotEmpty,
+              label: Text(
+                _debugLogs.length > 99 ? '99+' : '${_debugLogs.length}',
+              ),
+              child: const Icon(Icons.bug_report_outlined),
+            ),
+            tooltip: 'Debug logs',
+          ),
           if (widget.onToggleTheme != null)
             IconButton(
               onPressed: widget.onToggleTheme,
@@ -426,10 +579,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final path = isDark
         ? (_config.heroImageDark ?? _config.heroImage)!
         : _config.heroImage!;
-    // 웹에서는 web/ 경로로 로드해 asset bundle 이슈를 피한다.
-    final ImageProvider imageProvider = kIsWeb
-        ? NetworkImage(Uri.base.resolve(path.replaceFirst('assets/', '')).toString())
-        : AssetImage(path) as ImageProvider;
+    // AssetImage works on all Flutter targets (web, Android, iOS).
+    final ImageProvider imageProvider = AssetImage(path);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ClipRRect(
