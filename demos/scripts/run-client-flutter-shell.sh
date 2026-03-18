@@ -133,7 +133,8 @@ if [[ "$FLUTTER_DEVICE" == "chrome" ]]; then
   WEB_PORT="${FLUTTER_WEB_PORT:-8080}"
   echo ">>> 웹 서버 모드: http://localhost:$WEB_PORT"
   echo ">>> Edge·Chrome 등 브라우저에서 위 주소를 여세요."
-  flutter run -d web-server --web-port "$WEB_PORT" $DART_DEFINES 2>&1 | tee "$LOG"
+  # tee 파이프 금지: flutter run은 TTY가 없으면 즉시 종료됨
+  flutter run -d web-server --web-port "$WEB_PORT" $DART_DEFINES
 else
   echo ">>> 릴리즈 모드로 실행합니다 (debug 대비 성능 대폭 개선)."
   flutter run -d "$FLUTTER_DEVICE" --release $DART_DEFINES 2>&1 | tee "$LOG"

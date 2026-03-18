@@ -1,8 +1,9 @@
 // Copyright 2025 Google LLC
 //
-// A2UI Restaurant Finder — premium Flutter client.
-// Web(Chrome) + Android 모두 지원. AGENT_URL 은 --dart-define 으로 주입.
+// A2UI Restaurant Finder — Flutter client.
+// Web + Android 지원. AGENT_URL 은 --dart-define 으로 주입.
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:genui/genui.dart';
 import 'package:genui_a2ui/genui_a2ui.dart';
@@ -10,7 +11,7 @@ import 'package:logging/logging.dart';
 
 import 'config/app_config.dart';
 
-// ─── 인앱 디버그 패널용 로그 엔트리 ────────────────────────────────────────────
+// ─── 디버그 로그 엔트리 ─────────────────────────────────────────────────────────
 class _LogEntry {
   final String tag; // SEND | RECV | ERROR
   final String body;
@@ -25,42 +26,36 @@ void main() {
   runApp(const RestaurantShellApp());
 }
 
-// ─── 색상 팔레트 (다크 우선 / OLED 최적화) ─────────────────────────────────────
-const _kPrimary = Color(0xFF7B61FF); // 보라
-const _kAccent = Color(0xFF4ECDC4); // 민트
-const _kError = Color(0xFFFF6B6B); // 코랄 레드
-const _kDarkBg = Color(0xFF0B0B17); // 매우 어두운 남색
-const _kDarkSurface = Color(0xFF12122A); // 카드 배경
-const _kDarkBorder = Color(0xFF252550); // 카드 테두리
+// ─── 색상 팔레트 ──────────────────────────────────────────────────────────────
+const _kPrimary    = Color(0xFF7B61FF);
+const _kAccent     = Color(0xFF4ECDC4);
+const _kError      = Color(0xFFFF6B6B);
+const _kSuccess    = Color(0xFF4ADE80);
+const _kDarkBg     = Color(0xFF0B0B17);
+const _kDarkSurface = Color(0xFF12122A);
+const _kDarkBorder  = Color(0xFF252550);
 
 // ─── 루트 위젯 ──────────────────────────────────────────────────────────────────
 class RestaurantShellApp extends StatefulWidget {
   const RestaurantShellApp({super.key});
-
   @override
   State<RestaurantShellApp> createState() => _RestaurantShellAppState();
 }
 
 class _RestaurantShellAppState extends State<RestaurantShellApp> {
   ThemeMode _themeMode = ThemeMode.dark;
-
   void _toggleTheme() => setState(() {
-        _themeMode =
-            _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-      });
+    _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+  });
 
   static ThemeData _theme(Brightness b) => ThemeData(
-        useMaterial3: true,
-        brightness: b,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _kPrimary,
-          brightness: b,
-        ).copyWith(
-          primary: _kPrimary,
-          secondary: _kAccent,
-          error: _kError,
-        ),
-      );
+    useMaterial3: true,
+    brightness: b,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: _kPrimary,
+      brightness: b,
+    ).copyWith(primary: _kPrimary, secondary: _kAccent, error: _kError),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -75,50 +70,53 @@ class _RestaurantShellAppState extends State<RestaurantShellApp> {
   }
 }
 
-// ─── 메인 채팅 화면 ─────────────────────────────────────────────────────────────
+// ─── 메인 화면 ──────────────────────────────────────────────────────────────────
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key, this.onToggleTheme});
   final VoidCallback? onToggleTheme;
-
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
-  // ── 컨트롤러 ────────────────────────────────────────────────────────────────
+  // ── 컨트롤러 ──────────────────────────────────────────────────────────────
   final TextEditingController _textCtrl = TextEditingController();
-  final ScrollController _scrollCtrl = ScrollController();
   late AnimationController _dotAnim;
+  late AnimationController _fadeAnim;
 
-  // ── A2UI 핵심 객체 ──────────────────────────────────────────────────────────
+  // ── A2UI 핵심 객체 ────────────────────────────────────────────────────────
   final A2uiMessageProcessor _processor =
       A2uiMessageProcessor(catalogs: [CoreCatalogItems.asCatalog()]);
   late A2uiContentGenerator _generator;
   late GenUiConversation _conversation;
 
-  // ── 상태 ────────────────────────────────────────────────────────────────────
+  // ── 상태 ──────────────────────────────────────────────────────────────────
   AppConfig _config = restaurantConfig;
-  final List<ChatMessage> _messages = [];
   final List<_LogEntry> _logs = [];
   bool _loading = false;
+  bool _hasReceivedResponse = false; // 첫 응답 후 surface 전체화면 모드
+  int _responseVersion = 0;          // AnimatedSwitcher 트리거용
   String? _netError;
+  String? _lastStatusText;           // 에이전트 상태 텍스트 (표시용)
 
-  // ─── 생명주기 ─────────────────────────────────────────────────────────────
+  // ── 생명주기 ──────────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
     _dotAnim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      vsync: this, duration: const Duration(milliseconds: 1200),
     )..repeat();
+    _fadeAnim = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 300),
+    );
     _initClient();
   }
 
   @override
   void dispose() {
     _dotAnim.dispose();
+    _fadeAnim.dispose();
     _textCtrl.dispose();
-    _scrollCtrl.dispose();
     _conversation.dispose();
     _processor.dispose();
     _generator.dispose();
@@ -132,30 +130,33 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       a2uiMessageProcessor: _processor,
     );
 
-    // 텍스트 응답 수신
     _generator.textResponseStream.listen((text) {
       if (!mounted) return;
       setState(() {
         _netError = null;
-        _messages.insert(0, AiTextMessage.text(text));
-        _logs.insert(0, _LogEntry('RECV', text));
         _loading = false;
+        _hasReceivedResponse = true;
+        _responseVersion++;
+        _lastStatusText = text.isNotEmpty ? text : null;
+        _logs.insert(0, _LogEntry('RECV', text));
       });
     });
 
-    // 에러 수신
     _generator.errorStream.listen((err) {
       if (!mounted) return;
       final msg = err.error.toString();
       setState(() {
-        _netError = msg.contains('fetch') ||
+        _netError = (msg.contains('fetch') ||
                 msg.contains('ClientException') ||
-                msg.contains('refused')
+                msg.contains('refused') ||
+                msg.contains('Connection') ||
+                msg.contains('SocketException'))
             ? msg
             : null;
-        _messages.insert(0, AiTextMessage.text('Error: ${err.error}'));
-        _logs.insert(0, _LogEntry('ERROR', msg));
         _loading = false;
+        _hasReceivedResponse = true;
+        _responseVersion++;
+        _logs.insert(0, _LogEntry('ERROR', msg));
       });
     });
   }
@@ -165,30 +166,53 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _generator.dispose();
     setState(() {
       _config = next;
-      _messages.clear();
+      _logs.clear();
       _loading = false;
+      _hasReceivedResponse = false;
+      _responseVersion = 0;
       _netError = null;
+      _lastStatusText = null;
+    });
+    _initClient();
+  }
+
+  void _reset() {
+    _conversation.dispose();
+    _generator.dispose();
+    setState(() {
+      _logs.clear();
+      _loading = false;
+      _hasReceivedResponse = false;
+      _responseVersion = 0;
+      _netError = null;
+      _lastStatusText = null;
     });
     _initClient();
   }
 
   void _submit(String text) {
     final t = text.trim();
-    if (t.isEmpty) return;
+    if (t.isEmpty || _loading) return;
     _textCtrl.clear();
     setState(() {
-      _messages.insert(0, UserMessage.text(t));
-      _logs.insert(0, _LogEntry('SEND', t));
       _loading = true;
+      _netError = null;
+      _logs.insert(0, _LogEntry('SEND', t));
     });
-    // 텍스트 없이 A2UI만 오는 경우 spinner 무한 회전 방지
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted && _loading) setState(() => _loading = false);
+    // A2UI-only 응답(텍스트 없음) 시 spinner 무한 방지
+    Future.delayed(const Duration(seconds: 8), () {
+      if (mounted && _loading) {
+        setState(() {
+          _loading = false;
+          _hasReceivedResponse = true;
+          _responseVersion++;
+        });
+      }
     });
     _conversation.sendRequest(UserMessage.text(t));
   }
 
-  // ─── 빌드 ────────────────────────────────────────────────────────────────
+  // ─── 빌드 ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -198,69 +222,153 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       backgroundColor: isDark ? _kDarkBg : cs.surface,
       body: Column(
         children: [
+          // ── 앱바 ────────────────────────────────────────────────────────
           _AppBar(
             title: _config.title,
             isDark: isDark,
             cs: cs,
             logCount: _logs.length,
+            showReset: _hasReceivedResponse,
             onDebug: _showDebugPanel,
             onToggleTheme: widget.onToggleTheme,
+            onReset: _reset,
           ),
-          Expanded(
-            child: SingleChildScrollView(
-              controller: _scrollCtrl,
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // 앱 스위처
-                  _AppSwitcher(
-                    config: _config,
-                    isDark: isDark,
-                    cs: cs,
-                    onSwitch: _switchConfig,
-                  ),
-                  const SizedBox(height: 10),
-                  // 네트워크 에러 배너
-                  if (_netError != null) _ErrorBanner(cs: cs),
-                  // 히어로 이미지
-                  if (_config.heroImage != null) ...[
-                    _HeroImage(config: _config, isDark: isDark),
-                    const SizedBox(height: 10),
-                  ],
-                  // A2UI 서피스 (항상 표시 — loading 중에도 숨기지 않음)
-                  _SurfaceCard(
-                      processor: _processor, isDark: isDark, cs: cs),
-                  // 로딩 도트 인디케이터
-                  if (_loading) _LoadingDots(anim: _dotAnim, cs: cs),
-                  // 채팅 메시지 기록
-                  if (_messages.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    ..._messages.reversed.map((m) => _MessageBubble(
-                          message: m,
-                          isDark: isDark,
-                          cs: cs,
-                        )),
-                  ],
-                  const SizedBox(height: 100), // 입력창 공간 확보
-                ],
-              ),
+          // ── 앱 스위처 ────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+            child: _AppSwitcher(
+              config: _config,
+              isDark: isDark,
+              cs: cs,
+              onSwitch: _switchConfig,
             ),
+          ),
+          // ── 네트워크 에러 배너 ────────────────────────────────────────────
+          if (_netError != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+              child: _ErrorBanner(cs: cs, message: _netError),
+            ),
+          // ── 메인 컨텐츠 ──────────────────────────────────────────────────
+          Expanded(
+            child: _hasReceivedResponse
+                ? _buildSurfaceView(isDark, cs)
+                : _buildWelcomeView(isDark, cs),
           ),
         ],
       ),
-      // 입력창: 화면 하단 고정
       bottomNavigationBar: _InputBar(
         config: _config,
         controller: _textCtrl,
         isDark: isDark,
         cs: cs,
+        loading: _loading,
         onSubmit: _submit,
       ),
     );
   }
 
-  // ─── 디버그 패널 (클라이언트 SEND/RECV/ERROR) ────────────────────────────
+  // 응답 전: 히어로 + 안내 화면
+  Widget _buildWelcomeView(bool isDark, ColorScheme cs) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_config.heroImage != null) ...[
+            _HeroImage(config: _config, isDark: isDark),
+            const SizedBox(height: 18),
+          ],
+          // 안내 텍스트
+          Text(
+            _config.key == 'restaurant'
+                ? '맛집을 찾아드립니다 🍽️'
+                : '연락처를 찾아드립니다 👥',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white : cs.onSurface,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _config.key == 'restaurant'
+                ? '음식 종류와 지역을 입력하면\n맛집 목록 · 상세 정보 · 예약까지 한번에!'
+                : '이름이나 키워드로 연락처를 검색하세요.',
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? const Color(0xFF8080A0) : cs.onSurface.withOpacity(0.6),
+              height: 1.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          // 예시 검색 칩들
+          if (_config.key == 'restaurant') ...[
+            _SuggestionGrid(isDark: isDark, cs: cs, onTap: _submit),
+          ],
+          if (_loading) ...[
+            const SizedBox(height: 24),
+            _LoadingDots(anim: _dotAnim, cs: cs, message: '검색 중...'),
+          ],
+          const SizedBox(height: 80),
+        ],
+      ),
+    );
+  }
+
+  // 응답 후: surface 전체 화면
+  Widget _buildSurfaceView(bool isDark, ColorScheme cs) {
+    return Stack(
+      children: [
+        // Surface 카드가 전체 공간 차지
+        Positioned.fill(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            transitionBuilder: (child, anim) => FadeTransition(
+              opacity: anim,
+              child: child,
+            ),
+            child: _FullSurfaceCard(
+              key: ValueKey(_responseVersion),
+              processor: _processor,
+              isDark: isDark,
+              cs: cs,
+            ),
+          ),
+        ),
+        // 로딩 오버레이
+        if (_loading)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                color: (isDark ? _kDarkBg : Colors.white).withOpacity(0.7),
+                borderRadius: BorderRadius.circular(0),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _LoadingDots(anim: _dotAnim, cs: cs, message: '처리 중...'),
+                ],
+              ),
+            ),
+          ),
+        // 상태 텍스트 (하단 작은 배너)
+        if (_lastStatusText != null && !_loading)
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: _StatusBanner(text: _lastStatusText!, isDark: isDark, cs: cs),
+          ),
+      ],
+    );
+  }
+
+  // ─── 디버그 패널 ───────────────────────────────────────────────────────────
   void _showDebugPanel() {
     showModalBottomSheet(
       context: context,
@@ -269,104 +377,79 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.65,
-          maxChildSize: 0.95,
-          builder: (_, sc) => Column(
-            children: [
-              // 드래그 핸들
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3A3A5A),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.65,
+        maxChildSize: 0.95,
+        builder: (_, sc) => Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFF3A3A5A),
+                borderRadius: BorderRadius.circular(2),
               ),
-              // 패널 헤더
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 12, 8),
-                child: Row(
-                  children: [
-                    const Icon(Icons.terminal_rounded,
-                        color: _kAccent, size: 17),
-                    const SizedBox(width: 7),
-                    const Text(
-                      'Client Logs',
-                      style: TextStyle(
-                        color: _kAccent,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _Badge(count: _logs.length, color: _kPrimary),
-                    const Spacer(),
-                    // 서버 로그 힌트
-                    const Text(
-                      'Server: :10002/debug',
-                      style: TextStyle(
-                          color: Color(0xFF505070),
-                          fontSize: 10,
-                          fontFamily: 'monospace'),
-                    ),
-                    const SizedBox(width: 4),
-                    TextButton(
-                      onPressed: () {
-                        setState(() => _logs.clear());
-                        Navigator.pop(ctx);
-                      },
-                      style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFF505070)),
-                      child: const Text('Clear'),
-                    ),
-                  ],
-                ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 12, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.terminal_rounded, color: _kAccent, size: 17),
+                  const SizedBox(width: 7),
+                  const Text('Client Logs',
+                      style: TextStyle(color: _kAccent, fontWeight: FontWeight.bold,
+                          fontSize: 14, letterSpacing: 0.5)),
+                  const SizedBox(width: 8),
+                  _Badge(count: _logs.length, color: _kPrimary),
+                  const Spacer(),
+                  const Text('Server: :10002/debug',
+                      style: TextStyle(color: Color(0xFF505070), fontSize: 10,
+                          fontFamily: 'monospace')),
+                  const SizedBox(width: 4),
+                  TextButton(
+                    onPressed: () { setState(() => _logs.clear()); Navigator.pop(ctx); },
+                    style: TextButton.styleFrom(foregroundColor: const Color(0xFF505070)),
+                    child: const Text('Clear'),
+                  ),
+                ],
               ),
-              const Divider(color: Color(0xFF1E1E3A), height: 1),
-              // 로그 목록
-              Expanded(
-                child: _logs.isEmpty
-                    ? const _EmptyLogs()
-                    : ListView.builder(
-                        controller: sc,
-                        padding: const EdgeInsets.all(14),
-                        itemCount: _logs.length,
-                        itemBuilder: (_, i) => _LogCard(entry: _logs[i]),
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
+            ),
+            const Divider(color: Color(0xFF1E1E3A), height: 1),
+            Expanded(
+              child: _logs.isEmpty
+                  ? const _EmptyLogs()
+                  : ListView.builder(
+                      controller: sc,
+                      padding: const EdgeInsets.all(14),
+                      itemCount: _logs.length,
+                      itemBuilder: (_, i) => _LogCard(entry: _logs[i]),
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 분리된 위젯들 (가독성 + 재사용성)
+// 위젯 컴포넌트
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// 커스텀 앱바 (그라디언트 + 디버그 버튼 + 테마 토글)
+/// 커스텀 앱바
 class _AppBar extends StatelessWidget {
   const _AppBar({
-    required this.title,
-    required this.isDark,
-    required this.cs,
-    required this.logCount,
-    required this.onDebug,
-    this.onToggleTheme,
+    required this.title, required this.isDark, required this.cs,
+    required this.logCount, required this.showReset,
+    required this.onDebug, this.onToggleTheme, required this.onReset,
   });
 
   final String title;
-  final bool isDark;
+  final bool isDark, showReset;
   final ColorScheme cs;
   final int logCount;
-  final VoidCallback onDebug;
+  final VoidCallback onDebug, onReset;
   final VoidCallback? onToggleTheme;
 
   @override
@@ -377,15 +460,12 @@ class _AppBar extends StatelessWidget {
           colors: isDark
               ? [const Color(0xFF1A1035), _kDarkBg]
               : [cs.primaryContainer, cs.surface],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
         ),
-        boxShadow: [
-          BoxShadow(
-              color: _kPrimary.withOpacity(isDark ? 0.2 : 0.1),
-              blurRadius: 14,
-              offset: const Offset(0, 3))
-        ],
+        boxShadow: [BoxShadow(
+          color: _kPrimary.withOpacity(isDark ? 0.2 : 0.1),
+          blurRadius: 14, offset: const Offset(0, 3),
+        )],
       ),
       child: SafeArea(
         bottom: false,
@@ -395,15 +475,13 @@ class _AppBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
               children: [
-                // 앱 로고
+                // 로고
                 Container(
-                  width: 34,
-                  height: 34,
+                  width: 34, height: 34,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [_kPrimary, _kAccent],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                      begin: Alignment.topLeft, end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -412,18 +490,27 @@ class _AppBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    title,
+                  child: Text(title,
                     style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 16, fontWeight: FontWeight.w700,
                       color: isDark ? Colors.white : cs.onSurface,
                       letterSpacing: 0.2,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                // 디버그 버튼 (클라이언트 로그 패널)
+                // 새 검색 버튼 (응답 후에만 표시)
+                if (showReset)
+                  TextButton.icon(
+                    onPressed: onReset,
+                    icon: const Icon(Icons.search_rounded, size: 16),
+                    label: const Text('새 검색', style: TextStyle(fontSize: 12)),
+                    style: TextButton.styleFrom(
+                      foregroundColor: isDark ? _kAccent : cs.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    ),
+                  ),
+                // 디버그 버튼
                 Stack(
                   alignment: Alignment.topRight,
                   clipBehavior: Clip.none,
@@ -431,19 +518,15 @@ class _AppBar extends StatelessWidget {
                     IconButton(
                       onPressed: onDebug,
                       icon: Icon(Icons.bug_report_outlined,
-                          color: isDark
-                              ? _kPrimary.withOpacity(0.85)
-                              : cs.primary,
+                          color: isDark ? _kPrimary.withOpacity(0.85) : cs.primary,
                           size: 22),
                       tooltip: 'Client logs',
                     ),
                     if (logCount > 0)
                       Positioned(
-                        right: 6,
-                        top: 6,
+                        right: 6, top: 6,
                         child: Container(
-                          width: 8,
-                          height: 8,
+                          width: 8, height: 8,
                           decoration: const BoxDecoration(
                               color: _kAccent, shape: BoxShape.circle),
                         ),
@@ -473,10 +556,8 @@ class _AppBar extends StatelessWidget {
 /// 앱 스위처 (Restaurant ↔ Contacts)
 class _AppSwitcher extends StatelessWidget {
   const _AppSwitcher({
-    required this.config,
-    required this.isDark,
-    required this.cs,
-    required this.onSwitch,
+    required this.config, required this.isDark,
+    required this.cs, required this.onSwitch,
   });
 
   final AppConfig config;
@@ -494,15 +575,15 @@ class _AppSwitcher extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _switchBtn(context, '🍽️  Restaurant', restaurantConfig),
+          _btn(context, '🍽️  Restaurant', restaurantConfig),
           const SizedBox(width: 4),
-          _switchBtn(context, '👥  Contacts', contactsConfig),
+          _btn(context, '👥  Contacts', contactsConfig),
         ],
       ),
     );
   }
 
-  Widget _switchBtn(BuildContext ctx, String label, AppConfig cfg) {
+  Widget _btn(BuildContext ctx, String label, AppConfig cfg) {
     final isActive = config.key == cfg.key;
     return Expanded(
       child: GestureDetector(
@@ -515,23 +596,18 @@ class _AppSwitcher extends StatelessWidget {
             gradient: isActive
                 ? const LinearGradient(
                     colors: [_kPrimary, _kAccent],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  )
+                    begin: Alignment.centerLeft, end: Alignment.centerRight)
                 : null,
             borderRadius: BorderRadius.circular(10),
           ),
           alignment: Alignment.center,
-          child: Text(
-            label,
+          child: Text(label,
             style: TextStyle(
               fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
               fontSize: 13.5,
               color: isActive
                   ? Colors.white
-                  : (isDark
-                      ? const Color(0xFF6060A0)
-                      : cs.onSurface.withOpacity(0.55)),
+                  : (isDark ? const Color(0xFF6060A0) : cs.onSurface.withOpacity(0.55)),
             ),
           ),
         ),
@@ -540,7 +616,7 @@ class _AppSwitcher extends StatelessWidget {
   }
 }
 
-/// 히어로 이미지 (그라디언트 오버레이 포함)
+/// 히어로 이미지
 class _HeroImage extends StatelessWidget {
   const _HeroImage({required this.config, required this.isDark});
   final AppConfig config;
@@ -548,47 +624,39 @@ class _HeroImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final path =
-        isDark ? (config.heroImageDark ?? config.heroImage)! : config.heroImage!;
+    final path = isDark
+        ? (config.heroImageDark ?? config.heroImage)!
+        : config.heroImage!;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       child: Stack(
         children: [
           Image(
             image: AssetImage(path),
-            height: 148,
-            width: double.infinity,
-            fit: BoxFit.cover,
+            height: 180, width: double.infinity, fit: BoxFit.cover,
             errorBuilder: (_, __, ___) => Container(
-              height: 148,
+              height: 180,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Color(0xFF2A1060), Color(0xFF0A2040)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
                 ),
               ),
-              child:
-                  const Icon(Icons.restaurant_menu, size: 52, color: Colors.white30),
+              child: const Icon(Icons.restaurant_menu, size: 60, color: Colors.white24),
             ),
           ),
-          // 아래쪽 어두운 그라디언트 오버레이
           Positioned.fill(
-            child: DecoratedBox(
-              decoration: const BoxDecoration(
+            child: const DecoratedBox(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Colors.transparent, Color(0xDD000000)],
-                  begin: Alignment(0, 0),
-                  end: Alignment.bottomCenter,
+                  begin: Alignment(0, 0.2), end: Alignment.bottomCenter,
                 ),
               ),
             ),
           ),
-          // 오버레이 텍스트
           Positioned(
-            bottom: 12,
-            left: 14,
-            right: 14,
+            bottom: 16, left: 18, right: 18,
             child: Row(
               children: [
                 Expanded(
@@ -596,39 +664,24 @@ class _HeroImage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        config.title,
+                      Text(config.title,
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                      const Text(
-                        'Powered by A2UI · Google ADK',
-                        style: TextStyle(
-                          color: Colors.white60,
-                          fontSize: 11,
-                        ),
-                      ),
+                          color: Colors.white, fontSize: 18,
+                          fontWeight: FontWeight.bold, letterSpacing: 0.2)),
+                      const Text('Powered by A2UI · Google ADK',
+                        style: TextStyle(color: Colors.white60, fontSize: 11)),
                     ],
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: _kPrimary.withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(8),
+                    color: _kPrimary.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Text(
-                    'Live Demo',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600),
-                  ),
+                  child: const Text('Live Demo',
+                    style: TextStyle(color: Colors.white, fontSize: 11,
+                        fontWeight: FontWeight.w600)),
                 ),
               ],
             ),
@@ -639,10 +692,84 @@ class _HeroImage extends StatelessWidget {
   }
 }
 
-/// A2UI 서피스 카드 (항상 표시)
-class _SurfaceCard extends StatelessWidget {
-  const _SurfaceCard(
-      {required this.processor, required this.isDark, required this.cs});
+/// 검색 제안 그리드
+class _SuggestionGrid extends StatelessWidget {
+  const _SuggestionGrid({required this.isDark, required this.cs, required this.onTap});
+  final bool isDark;
+  final ColorScheme cs;
+  final void Function(String) onTap;
+
+  static const _suggestions = [
+    ('🍜', 'NYC 중식 Top 5', 'Top 5 Chinese restaurants in New York'),
+    ('🍝', 'NYC 이탈리안', 'Top 5 Italian restaurants in New York'),
+    ('🍣', 'NYC 스시 맛집', 'Top 5 Sushi restaurants in New York'),
+    ('🥩', 'NYC 스테이크', 'Top 5 Steak restaurants in New York'),
+    ('🍕', 'NYC 피자 Best', 'Top 5 Pizza places in New York'),
+    ('🥗','건강식 맛집', 'Top 5 Healthy restaurants in New York'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text('인기 검색어',
+            style: TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w600,
+              color: isDark ? const Color(0xFF8080A0) : cs.onSurface.withOpacity(0.6),
+            )),
+        ),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 3.0,
+          children: _suggestions.map((s) {
+            return GestureDetector(
+              onTap: () => onTap(s.$3),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? _kDarkSurface : cs.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? _kDarkBorder : cs.outlineVariant,
+                    width: 0.8,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 12),
+                    Text(s.$1, style: const TextStyle(fontSize: 18)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(s.$2,
+                        style: TextStyle(
+                          fontSize: 12.5, fontWeight: FontWeight.w500,
+                          color: isDark ? const Color(0xFFD0D0F0) : cs.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+/// Surface 전체화면 카드
+class _FullSurfaceCard extends StatelessWidget {
+  const _FullSurfaceCard({super.key, required this.processor,
+      required this.isDark, required this.cs});
   final A2uiMessageProcessor processor;
   final bool isDark;
   final ColorScheme cs;
@@ -650,22 +777,21 @@ class _SurfaceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 120),
+      margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
       decoration: BoxDecoration(
         color: isDark ? _kDarkSurface : cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isDark ? _kDarkBorder : cs.outlineVariant),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark ? _kDarkBorder : cs.outlineVariant,
+          width: 0.8,
+        ),
         boxShadow: isDark
-            ? [
-                BoxShadow(
-                    color: _kPrimary.withOpacity(0.06),
-                    blurRadius: 20,
-                    spreadRadius: 2)
-              ]
+            ? [BoxShadow(color: _kPrimary.withOpacity(0.07),
+                blurRadius: 24, spreadRadius: 2)]
             : null,
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: GenUiSurface(host: processor, surfaceId: 'default'),
       ),
     );
@@ -674,134 +800,43 @@ class _SurfaceCard extends StatelessWidget {
 
 /// 로딩 도트 애니메이션
 class _LoadingDots extends StatelessWidget {
-  const _LoadingDots({required this.anim, required this.cs});
+  const _LoadingDots({required this.anim, required this.cs, this.message});
   final AnimationController anim;
   final ColorScheme cs;
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: AnimatedBuilder(
-        animation: anim,
-        builder: (_, __) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(3, (i) {
-              final phase = ((anim.value * 3 - i) % 3) / 3;
-              final scale = 0.5 + 0.5 * (phase < 0.5 ? phase * 2 : (1 - phase) * 2);
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: 9 * scale,
-                height: 9 * scale,
-                decoration: BoxDecoration(
-                  color: cs.primary.withOpacity(0.4 + 0.6 * scale),
-                  shape: BoxShape.circle,
-                ),
-              );
-            }),
-          );
-        },
-      ),
-    );
-  }
-}
-
-/// 메시지 버블
-class _MessageBubble extends StatelessWidget {
-  const _MessageBubble(
-      {required this.message, required this.isDark, required this.cs});
-  final ChatMessage message;
-  final bool isDark;
-  final ColorScheme cs;
-
-  @override
-  Widget build(BuildContext context) {
-    final isUser = message is UserMessage;
-    final text = isUser
-        ? (message as UserMessage).text
-        : (message as AiTextMessage).text;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // AI 아바타
-          if (!isUser) ...[
-            Container(
-              width: 30,
-              height: 30,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                    colors: [_kPrimary, _kAccent],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.smart_toy_outlined,
-                  color: Colors.white, size: 15),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: isUser
-                    ? const LinearGradient(
-                        colors: [_kPrimary, Color(0xFF5A45CC)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isUser
-                    ? null
-                    : (isDark ? const Color(0xFF1A1A35) : cs.surfaceContainerHighest),
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isUser ? 16 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 16),
-                ),
-                border: isUser
-                    ? null
-                    : Border.all(
-                        color: isDark
-                            ? _kAccent.withOpacity(0.12)
-                            : cs.outlineVariant,
-                        width: 0.8),
-              ),
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: isUser
-                      ? Colors.white
-                      : (isDark ? const Color(0xFFD0D0F0) : cs.onSurface),
-                  fontSize: 14,
-                  height: 1.45,
-                ),
-              ),
+          AnimatedBuilder(
+            animation: anim,
+            builder: (_, __) => Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(3, (i) {
+                final phase = ((anim.value * 3 - i) % 3) / 3;
+                final scale = 0.5 + 0.5 * (phase < 0.5 ? phase * 2 : (1 - phase) * 2);
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 5),
+                  width: 10 * scale, height: 10 * scale,
+                  decoration: BoxDecoration(
+                    color: cs.primary.withOpacity(0.4 + 0.6 * scale),
+                    shape: BoxShape.circle,
+                  ),
+                );
+              }),
             ),
           ),
-          // 사용자 아바타
-          if (isUser) ...[
-            const SizedBox(width: 8),
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E40) : cs.surfaceContainerHighest,
-                shape: BoxShape.circle,
-                border: Border.all(
-                    color: _kPrimary.withOpacity(0.4), width: 0.8),
-              ),
-              child: Icon(Icons.person_outline,
-                  color: cs.primary, size: 16),
-            ),
+          if (message != null) ...[
+            const SizedBox(height: 10),
+            Text(message!,
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurface.withOpacity(0.5),
+              )),
           ],
         ],
       ),
@@ -809,24 +844,67 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-/// 하단 고정 입력바 (예시 칩 + 텍스트필드 + 전송 버튼)
+/// 하단 상태 텍스트 배너
+class _StatusBanner extends StatelessWidget {
+  const _StatusBanner({required this.text, required this.isDark, required this.cs});
+  final String text;
+  final bool isDark;
+  final ColorScheme cs;
+
+  @override
+  Widget build(BuildContext context) {
+    if (text.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF0F0F22).withOpacity(0.95)
+            : cs.surfaceContainerHighest.withOpacity(0.95),
+        border: Border(
+          top: BorderSide(
+            color: isDark ? _kDarkBorder : cs.outlineVariant,
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.smart_toy_outlined,
+              color: isDark ? _kAccent : cs.primary, size: 14),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? const Color(0xFF9090C0) : cs.onSurface.withOpacity(0.7),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 하단 입력바
 class _InputBar extends StatelessWidget {
   const _InputBar({
-    required this.config,
-    required this.controller,
-    required this.isDark,
-    required this.cs,
-    required this.onSubmit,
+    required this.config, required this.controller,
+    required this.isDark, required this.cs,
+    required this.loading, required this.onSubmit,
   });
 
   final AppConfig config;
   final TextEditingController controller;
-  final bool isDark;
+  final bool isDark, loading;
   final ColorScheme cs;
   final void Function(String) onSubmit;
 
-  List<String> get _prompts => config.key == 'restaurant'
-      ? ['Top 5 Chinese in NYC', 'Best Italian NYC', '맛집 추천 Top5']
+  List<String> get _quickPrompts => config.key == 'restaurant'
+      ? ['NYC 중식 Top 5', '이탈리안 Top 5', '스시 맛집']
       : ['Alex Jordan', 'Find: Jane'];
 
   @override
@@ -841,62 +919,50 @@ class _InputBar extends StatelessWidget {
             width: 0.8,
           ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.4 : 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
+        boxShadow: [BoxShadow(
+          color: Colors.black.withOpacity(isDark ? 0.4 : 0.06),
+          blurRadius: 16, offset: const Offset(0, -4),
+        )],
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 예시 칩
+          // 빠른 검색 칩
           Wrap(
-            spacing: 7,
-            runSpacing: 5,
-            children: _prompts
-                .map((t) => GestureDetector(
-                      onTap: () => onSubmit(t),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 11, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? _kPrimary.withOpacity(0.1)
-                              : cs.primaryContainer.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: _kPrimary.withOpacity(isDark ? 0.3 : 0.35),
-                              width: 0.8),
-                        ),
-                        child: Text(
-                          t,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? _kPrimary.withOpacity(0.9)
-                                : cs.primary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ))
-                .toList(),
+            spacing: 7, runSpacing: 5,
+            children: _quickPrompts.map((t) => GestureDetector(
+              onTap: loading ? null : () => onSubmit(t),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? _kPrimary.withOpacity(loading ? 0.05 : 0.1)
+                      : cs.primaryContainer.withOpacity(loading ? 0.3 : 0.5),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: _kPrimary.withOpacity(isDark ? (loading ? 0.15 : 0.3) : 0.35),
+                      width: 0.8),
+                ),
+                child: Text(t,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? _kPrimary.withOpacity(loading ? 0.4 : 0.9)
+                        : cs.primary.withOpacity(loading ? 0.4 : 1.0),
+                    fontWeight: FontWeight.w500,
+                  )),
+              ),
+            )).toList(),
           ),
           const SizedBox(height: 9),
-          // 입력 필드 + 전송 버튼
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? _kDarkSurface
-                        : cs.surfaceContainerHighest,
+                    color: isDark ? _kDarkSurface : cs.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
                         color: isDark
@@ -906,13 +972,14 @@ class _InputBar extends StatelessWidget {
                   ),
                   child: TextField(
                     controller: controller,
+                    enabled: !loading,
                     style: TextStyle(
-                        color: isDark
-                            ? const Color(0xFFE0E0F0)
-                            : cs.onSurface,
+                        color: isDark ? const Color(0xFFE0E0F0) : cs.onSurface,
                         fontSize: 14),
                     decoration: InputDecoration(
-                      hintText: config.placeholder ?? 'Ask about restaurants…',
+                      hintText: loading
+                          ? '처리 중...'
+                          : (config.placeholder ?? 'Ask about restaurants…'),
                       hintStyle: TextStyle(
                           color: isDark
                               ? const Color(0xFF505075)
@@ -922,7 +989,7 @@ class _InputBar extends StatelessWidget {
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 18, vertical: 12),
                     ),
-                    onSubmitted: onSubmit,
+                    onSubmitted: loading ? null : onSubmit,
                     textInputAction: TextInputAction.send,
                     minLines: 1,
                     maxLines: 4,
@@ -930,26 +997,27 @@ class _InputBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              // 전송 버튼 (그라디언트 원)
+              // 전송 버튼
               Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [_kPrimary, _kAccent],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                decoration: BoxDecoration(
+                  gradient: loading
+                      ? null
+                      : const LinearGradient(
+                          colors: [_kPrimary, _kAccent],
+                          begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  color: loading ? const Color(0xFF303050) : null,
                   shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                        color: Color(0x557B61FF),
-                        blurRadius: 12,
-                        offset: Offset(0, 4))
-                  ],
+                  boxShadow: loading
+                      ? null
+                      : const [BoxShadow(
+                          color: Color(0x557B61FF),
+                          blurRadius: 12, offset: Offset(0, 4))],
                 ),
                 child: IconButton(
-                  onPressed: () => onSubmit(controller.text),
-                  icon: const Icon(Icons.send_rounded,
-                      color: Colors.white, size: 20),
+                  onPressed: loading ? null : () => onSubmit(controller.text),
+                  icon: Icon(
+                    loading ? Icons.hourglass_empty_rounded : Icons.send_rounded,
+                    color: Colors.white, size: 20),
                   padding: const EdgeInsets.all(12),
                 ),
               ),
@@ -963,13 +1031,13 @@ class _InputBar extends StatelessWidget {
 
 /// 네트워크 에러 배너
 class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.cs});
+  const _ErrorBanner({required this.cs, this.message});
   final ColorScheme cs;
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
       decoration: BoxDecoration(
         color: _kError.withOpacity(0.1),
@@ -977,24 +1045,22 @@ class _ErrorBanner extends StatelessWidget {
         border: Border.all(color: _kError.withOpacity(0.35), width: 0.8),
       ),
       child: Row(
-        children: const [
-          Icon(Icons.wifi_off_rounded, color: _kError, size: 17),
-          SizedBox(width: 10),
+        children: [
+          const Icon(Icons.wifi_off_rounded, color: _kError, size: 17),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('에이전트에 연결할 수 없습니다',
-                    style: TextStyle(
-                        color: _kError,
-                        fontWeight: FontWeight.w600,
+                const Text('에이전트에 연결할 수 없습니다',
+                    style: TextStyle(color: _kError, fontWeight: FontWeight.w600,
                         fontSize: 13)),
-                Text('demos/run-demo.sh restaurant-flutter',
-                    style: TextStyle(
-                        color: _kError,
-                        fontSize: 11,
-                        fontFamily: 'monospace')),
+                if (message != null)
+                  Text(message!,
+                      style: const TextStyle(color: _kError, fontSize: 10,
+                          fontFamily: 'monospace'),
+                      maxLines: 2, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -1004,7 +1070,7 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
-/// 배지 (숫자 표시)
+/// 배지
 class _Badge extends StatelessWidget {
   const _Badge({required this.count, required this.color});
   final int count;
@@ -1018,31 +1084,27 @@ class _Badge extends StatelessWidget {
         color: color.withOpacity(0.2),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(
-        '$count',
-        style:
-            TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold),
-      ),
+      child: Text('$count',
+          style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
     );
   }
 }
 
-/// 로그 카드 (디버그 패널용)
+/// 로그 카드
 class _LogCard extends StatelessWidget {
   const _LogCard({required this.entry});
   final _LogEntry entry;
 
   static const _tagColors = {
-    'SEND': _kPrimary,
-    'RECV': _kAccent,
-    'ERROR': _kError,
+    'SEND': _kPrimary, 'RECV': _kAccent, 'ERROR': _kError,
   };
 
   @override
   Widget build(BuildContext context) {
     final color = _tagColors[entry.tag] ?? Colors.white54;
-    final ts =
-        '${entry.ts.hour.toString().padLeft(2, '0')}:${entry.ts.minute.toString().padLeft(2, '0')}:${entry.ts.second.toString().padLeft(2, '0')}';
+    final ts = '${entry.ts.hour.toString().padLeft(2,'0')}:'
+        '${entry.ts.minute.toString().padLeft(2,'0')}:'
+        '${entry.ts.second.toString().padLeft(2,'0')}';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -1055,41 +1117,25 @@ class _LogCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.13),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Text(
-                  entry.tag,
-                  style: TextStyle(
-                      color: color,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.0),
-                ),
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.13),
+                borderRadius: BorderRadius.circular(5),
               ),
-              const SizedBox(width: 8),
-              Text(ts,
-                  style: const TextStyle(
-                      color: Color(0xFF505075), fontSize: 10)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            entry.body,
-            style: const TextStyle(
-              color: Color(0xFFB0B0D0),
-              fontSize: 12,
-              fontFamily: 'monospace',
+              child: Text(entry.tag,
+                  style: TextStyle(color: color, fontSize: 10,
+                      fontWeight: FontWeight.bold, letterSpacing: 1.0)),
             ),
-            maxLines: 10,
-            overflow: TextOverflow.ellipsis,
-          ),
+            const SizedBox(width: 8),
+            Text(ts, style: const TextStyle(color: Color(0xFF505075), fontSize: 10)),
+          ]),
+          const SizedBox(height: 6),
+          Text(entry.body,
+            style: const TextStyle(color: Color(0xFFB0B0D0), fontSize: 12,
+                fontFamily: 'monospace'),
+            maxLines: 10, overflow: TextOverflow.ellipsis),
         ],
       ),
     );

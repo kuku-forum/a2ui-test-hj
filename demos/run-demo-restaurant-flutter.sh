@@ -51,7 +51,22 @@ echo ">>>   (로그 확인: tail -f $DEMOS_ROOT/logs/restaurant-agent.log)"
 uv run . --port 10002 > "$DEMOS_ROOT/logs/restaurant-agent.log" 2>&1 &
 PID=$!
 trap "kill $PID 2>/dev/null || true" EXIT
-sleep 3
+
+# sleep 3 대신 포트 개방을 확인 (최대 30초 대기)
+echo ">>> 에이전트 포트 10002 대기 중..."
+_agent_ready=0
+for _i in $(seq 1 30); do
+  if (echo > /dev/tcp/localhost/10002) 2>/dev/null; then
+    echo ">>> 에이전트 준비 완료 (${_i}s)"
+    _agent_ready=1
+    break
+  fi
+  sleep 1
+done
+if [[ $_agent_ready -eq 0 ]]; then
+  echo ">>> WARNING: 에이전트가 30s 내에 응답하지 않습니다. 로그 확인:"
+  echo ">>>   tail -f $DEMOS_ROOT/logs/restaurant-agent.log"
+fi
 
 # ── Flutter 디바이스 감지 및 AGENT_URL 설정 ────────────────────────────────────
 # DART_DEFINES 와 FLUTTER_DEVICE 를 설정한다.
@@ -166,7 +181,8 @@ if [[ "$FLUTTER_DEVICE" == "chrome" ]]; then
   WEB_PORT="${FLUTTER_WEB_PORT:-8080}"
   echo ">>> 웹 서버 모드: http://localhost:$WEB_PORT"
   echo ">>> Edge·Chrome 등 브라우저에서 위 주소를 여세요."
-  flutter run -d web-server --web-port "$WEB_PORT" $DART_DEFINES 2>&1 | tee "$LOG"
+  # tee 파이프 금지: flutter run은 TTY가 없으면 즉시 종료됨
+  flutter run -d web-server --web-port "$WEB_PORT" $DART_DEFINES
 else
   # 기기: release 모드로 실행 → setFrameRateCategory 로그 없음, 성능 대폭 개선
   echo ">>> 릴리즈 모드로 실행합니다 (debug 대비 성능 대폭 개선)."
