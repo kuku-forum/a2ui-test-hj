@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-# Run only the Flutter Restaurant Shell client. Use in terminal 2; start agent first in terminal 1 (e.g. ./scripts/run-agent-restaurant.sh).
+# Flutter Restaurant Shell 클라이언트만 실행.
+# 에이전트는 터미널 1에서 먼저 실행하세요: ./scripts/run-agent-restaurant.sh
 # Expects Restaurant Finder agent on http://localhost:10002.
+#
+# 사용법:
+#   ./scripts/run-client-flutter-shell.sh                  → Chrome (웹) 또는 Android 자동 감지
+#   FLUTTER_DEVICE=android ./scripts/run-client-flutter-shell.sh    → Android 기기 자동 감지
+#   FLUTTER_DEVICE=RF8XN3J1H2T ./scripts/run-client-flutter-shell.sh → 특정 기기 ID
 #
 # 학습 포인트:
 # - Android 에뮬레이터는 host localhost를 직접 보지 못하므로 10.0.2.2를 사용한다.
+# - 실물 기기는 호스트 PC의 LAN IP를 사용한다 (자동 감지).
 # - "화면은 뜨는데 데이터가 안 보임" 문제는 대개 AGENT_URL/디바이스 매핑 이슈다.
 
 set -e
@@ -21,35 +28,60 @@ if ! command -v flutter &>/dev/null; then
   exit 1
 fi
 
-# FLUTTER_DEVICE=android     → 연결된 첫 번째 Android 기기 자동 감지
-# FLUTTER_DEVICE=RF8XN3J1H2T → 특정 기기 ID 직접 사용
-# 에뮬레이터면 10.0.2.2, 실물 기기면 호스트 LAN IP 로 AGENT_URL 을 설정한다.
+# ── Flutter 디바이스 감지 및 AGENT_URL 설정 ────────────────────────────────────
+# String.fromEnvironment 는 컴파일 타임 상수이므로 --dart-define 으로 주입한다.
+# 실물 기기는 PC의 LAN IP, 에뮬레이터는 10.0.2.2, 웹은 localhost 를 사용한다.
+
 _set_agent_url() {
   local device_line="$1"
+  local agent_host
   if echo "$device_line" | grep -qi "emulator"; then
-    DART_DEFINES="--dart-define=AGENT_URL=http://10.0.2.2:10002"
+    agent_host="10.0.2.2"
   else
-    local host_ip
-    host_ip=$(ip route get 8.8.8.8 2>/dev/null | awk '/src/{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -1)
-    host_ip="${host_ip:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
-    if [[ -n "$host_ip" ]]; then
-      echo ">>> 실물 기기 감지. 에이전트 URL: http://$host_ip:10002"
-      DART_DEFINES="--dart-define=AGENT_URL=http://$host_ip:10002"
-    else
-      echo ">>> WARNING: 호스트 IP 감지 실패. 필요 시 AGENT_URL 을 직접 설정하세요."
+    agent_host=$(ip route get 8.8.8.8 2>/dev/null \
+      | awk '/src/{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -1)
+    agent_host="${agent_host:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
+    if [[ -z "$agent_host" ]]; then
+      echo ">>> WARNING: 호스트 IP 감지 실패."
+      echo ">>>   직접 지정: AGENT_URL=http://<호스트IP>:10002 flutter run ..."
+      return
     fi
+    echo ">>> 실물 기기 감지. 에이전트 URL: http://$agent_host:10002"
   fi
+  DART_DEFINES="--dart-define=AGENT_URL=http://$agent_host:10002 --dart-define=CONTACTS_AGENT_URL=http://$agent_host:10003"
 }
 
 resolve_device() {
   DART_DEFINES=""
-  [[ -z "${FLUTTER_DEVICE:-}" ]] && return
+  local devices_output
+  devices_output=$(flutter devices 2>/dev/null)
+
+  if [[ -z "${FLUTTER_DEVICE:-}" ]]; then
+    local android_line
+    android_line=$(echo "$devices_output" | grep -iE "android|mobile" | head -1)
+    if [[ -n "$android_line" ]]; then
+      local id
+      id=$(echo "$android_line" | sed 's/ • /•/g' | awk -F'•' '{print $2}' | xargs)
+      echo ">>> Android 기기 자동 감지: $android_line"
+      echo ">>> 사용할 기기 ID: $id"
+      FLUTTER_DEVICE="$id"
+      _set_agent_url "$android_line"
+    elif echo "$devices_output" | grep -q "Chrome"; then
+      FLUTTER_DEVICE="chrome"
+    else
+      echo ">>> 실행 가능한 기기가 없습니다."
+      echo "$devices_output"
+      exit 1
+    fi
+    return
+  fi
+
   local line
   if [[ "$FLUTTER_DEVICE" =~ ^[Aa]ndroid$ ]]; then
-    line=$(flutter devices 2>/dev/null | grep -iE "android|mobile" | head -1)
+    line=$(echo "$devices_output" | grep -iE "android|mobile" | head -1)
     if [[ -z "$line" ]]; then
       echo ">>> 연결된 Android 기기가 없습니다. 'flutter devices' 로 확인하세요."
-      flutter devices 2>/dev/null
+      echo "$devices_output"
       exit 1
     fi
     local id
@@ -58,23 +90,24 @@ resolve_device() {
     echo ">>> 사용할 기기 ID: $id"
     FLUTTER_DEVICE="$id"
   else
-    # 특정 기기 ID → flutter devices 에서 해당 기기 정보 조회
-    line=$(flutter devices 2>/dev/null | grep "$FLUTTER_DEVICE" | head -1)
+    line=$(echo "$devices_output" | grep "$FLUTTER_DEVICE" | head -1)
   fi
   _set_agent_url "$line"
 }
 
+# ── Flutter 클라이언트 실행 ─────────────────────────────────────────────────────
 mkdir -p "$DEMOS_ROOT/logs"
-LOG_FILE="$DEMOS_ROOT/logs/restaurant-flutter-client.log"
-echo ">>> Flutter Restaurant Shell only. Log: $LOG_FILE"
-echo ">>> Ensure agent is running (e.g. ./scripts/run-agent-restaurant.sh in another terminal)."
+LOG="$DEMOS_ROOT/logs/restaurant-flutter-client.log"
+echo ">>> Flutter Restaurant Shell only. Log: $LOG"
+echo ">>> Ensure agent is running (터미널 1: ./scripts/run-agent-restaurant.sh)."
 cd "$ROOT/samples/client/flutter/restaurant_shell"
-flutter pub get
+flutter pub get --quiet
 resolve_device
-if [[ -n "${FLUTTER_DEVICE:-}" ]]; then
-  flutter run -d "$FLUTTER_DEVICE" $DART_DEFINES 2>&1 | tee "$LOG_FILE"
-elif flutter devices 2>/dev/null | grep -q "Chrome"; then
-  flutter run -d chrome 2>&1 | tee "$LOG_FILE"
+
+echo ">>> FLUTTER_DEVICE=$FLUTTER_DEVICE"
+if [[ "$FLUTTER_DEVICE" == "chrome" ]]; then
+  flutter run -d chrome $DART_DEFINES 2>&1 | tee "$LOG"
 else
-  flutter run $DART_DEFINES 2>&1 | tee "$LOG_FILE"
+  echo ">>> 릴리즈 모드로 실행합니다 (debug 대비 성능 대폭 개선)."
+  flutter run -d "$FLUTTER_DEVICE" --release $DART_DEFINES 2>&1 | tee "$LOG"
 fi
