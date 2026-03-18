@@ -111,7 +111,7 @@ LOG="$DEMOS_ROOT/logs/restaurant-flutter-client.log"
 echo ">>> Flutter Restaurant Shell only. Log: $LOG"
 echo ">>> Ensure agent is running (터미널 1: ./scripts/run-agent-restaurant.sh)."
 cd "$ROOT/samples/client/flutter/restaurant_shell"
-flutter pub get --quiet
+flutter pub get
 resolve_device
 
 echo ">>> FLUTTER_DEVICE=$FLUTTER_DEVICE"

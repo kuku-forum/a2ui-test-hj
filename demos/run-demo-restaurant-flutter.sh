@@ -144,7 +144,7 @@ resolve_device() {
 # ── Flutter 클라이언트 실행 ─────────────────────────────────────────────────────
 echo ">>> Starting Flutter Restaurant Shell. Log: $LOG"
 cd "$FLUTTER_SHELL"
-flutter pub get --quiet
+flutter pub get
 resolve_device
 
 echo ">>> FLUTTER_DEVICE=$FLUTTER_DEVICE"
