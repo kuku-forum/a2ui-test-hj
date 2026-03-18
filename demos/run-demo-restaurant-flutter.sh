@@ -66,16 +66,28 @@ _set_agent_url() {
   local agent_host
   if echo "$device_line" | grep -qi "emulator"; then
     agent_host="10.0.2.2"
+    echo ">>> 에뮬레이터 감지. 에이전트 URL: http://$agent_host:10002"
   else
-    agent_host=$(ip route get 8.8.8.8 2>/dev/null \
-      | awk '/src/{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -1)
-    agent_host="${agent_host:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
-    if [[ -z "$agent_host" ]]; then
-      echo ">>> WARNING: 호스트 IP 감지 실패."
-      echo ">>>   직접 지정: AGENT_URL=http://<호스트IP>:10002 flutter run ..."
-      return
+    # adb reverse: 폰에서 localhost:PORT → PC의 PORT 로 포워딩 (Galaxy/실물 기기 권장).
+    # adb reverse 성공 → localhost 사용 (가장 안정적).
+    # 실패 시 → PC LAN IP로 폴백 (Wi-Fi 같은 네트워크 필요).
+    if command -v adb &>/dev/null && \
+       adb reverse tcp:10002 tcp:10002 2>/dev/null && \
+       adb reverse tcp:10003 tcp:10003 2>/dev/null; then
+      agent_host="localhost"
+      echo ">>> [adb reverse] 포트 포워딩 성공 → 폰에서 localhost:10002 사용"
+    else
+      echo ">>> [adb reverse 실패] LAN IP로 폴백 (adb 미설치 또는 기기 미연결)"
+      agent_host=$(ip route get 8.8.8.8 2>/dev/null \
+        | awk '/src/{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -1)
+      agent_host="${agent_host:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
+      if [[ -z "$agent_host" ]]; then
+        echo ">>> WARNING: 호스트 IP 감지 실패."
+        echo ">>>   USB 연결 후 adb reverse 또는 AGENT_URL=http://<IP>:10002 직접 지정"
+        return
+      fi
+      echo ">>> 실물 기기 감지. LAN IP 에이전트 URL: http://$agent_host:10002"
     fi
-    echo ">>> 실물 기기 감지. 에이전트 URL: http://$agent_host:10002"
   fi
   # restaurant(10002) 과 contacts(10003) 둘 다 설정
   DART_DEFINES="--dart-define=AGENT_URL=http://$agent_host:10002 --dart-define=CONTACTS_AGENT_URL=http://$agent_host:10003"
