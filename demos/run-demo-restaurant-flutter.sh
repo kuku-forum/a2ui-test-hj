@@ -110,12 +110,9 @@ resolve_device() {
       echo ">>> 사용할 기기 ID: $id"
       FLUTTER_DEVICE="$id"
       _set_agent_url "$android_line"
-    elif echo "$devices_output" | grep -q "Chrome"; then
-      FLUTTER_DEVICE="chrome"
     else
-      echo ">>> 실행 가능한 기기가 없습니다."
-      echo "$devices_output"
-      exit 1
+      echo ">>> Android 기기 없음 → Chrome(웹)으로 실행합니다."
+      FLUTTER_DEVICE="chrome"
     fi
     return
   fi
