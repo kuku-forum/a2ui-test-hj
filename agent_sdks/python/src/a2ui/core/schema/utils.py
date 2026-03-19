@@ -18,7 +18,7 @@ import json
 import logging
 import os
 import importlib.resources
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from .constants import A2UI_ASSET_PACKAGE, SPECIFICATION_DIR, ENCODING
 from .catalog_provider import FileSystemCatalogProvider
@@ -40,7 +40,7 @@ def load_from_bundled_resource(
     version: str,
     resource_key: str,
     spec_map: Dict[str, Dict[str, str]],
-) -> Dict[str, Any]:
+) -> Optional[Dict[str, Any]]:
   """Loads a schema resource from bundled package resources."""
   spec_map = spec_map.get(version)
   if not spec_map:

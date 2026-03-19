@@ -79,7 +79,7 @@ def get_a2ui_datapart(part: Part) -> Optional[DataPart]:
 
 def get_a2ui_agent_extension(
     accepts_inline_catalogs: bool = False,
-    supported_catalog_ids: List[str] = [],
+    supported_catalog_ids: Optional[List[str]] = None,
 ) -> AgentExtension:
   """Creates the A2UI AgentExtension configuration.
 

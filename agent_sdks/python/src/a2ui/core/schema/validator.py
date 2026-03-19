@@ -13,8 +13,12 @@
 # limitations under the License.
 
 import copy
+import logging
+import posixpath
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple, Union, Iterator
+
+logger = logging.getLogger(__name__)
 
 from jsonschema import Draft202012Validator
 
@@ -162,29 +166,30 @@ class A2uiValidator:
 
     # Even in v0.8, we may have references to common_types.json or other files.
     base_uri = self._catalog.s2c_schema.get("$id", BASE_SCHEMA_URL)
-    import os
 
     def get_sibling_uri(uri, filename):
-      return os.path.join(os.path.dirname(uri), filename)
+      return posixpath.join(posixpath.dirname(uri), filename)
 
     common_types_uri = get_sibling_uri(base_uri, "common_types.json")
 
-    resources = [
-        (
-            common_types_uri,
-            Resource.from_contents(
-                self._catalog.common_types_schema,
-                default_specification=DRAFT202012,
-            ),
-        ),
-        (
-            "common_types.json",
-            Resource.from_contents(
-                self._catalog.common_types_schema,
-                default_specification=DRAFT202012,
-            ),
-        ),
-    ]
+    resources = []
+    if self._catalog.common_types_schema is not None:
+      resources.extend([
+          (
+              common_types_uri,
+              Resource.from_contents(
+                  self._catalog.common_types_schema,
+                  default_specification=DRAFT202012,
+              ),
+          ),
+          (
+              "common_types.json",
+              Resource.from_contents(
+                  self._catalog.common_types_schema,
+                  default_specification=DRAFT202012,
+              ),
+          ),
+      ])
 
     registry = Registry().with_resources(resources)
     validator_schema = copy.deepcopy(full_schema)
@@ -205,10 +210,9 @@ class A2uiValidator:
     # these resolve to https://a2ui.org/specification/v0_9/catalog.json.
     # We must register them using these absolute URIs.
     base_uri = self._catalog.s2c_schema.get("$id", BASE_SCHEMA_URL)
-    import os
 
     def get_sibling_uri(uri, filename):
-      return os.path.join(os.path.dirname(uri), filename)
+      return posixpath.join(posixpath.dirname(uri), filename)
 
     catalog_uri = get_sibling_uri(base_uri, "catalog.json")
     common_types_uri = get_sibling_uri(base_uri, "common_types.json")
@@ -440,7 +444,7 @@ def _extract_component_ref_fields(
             comp_wrapper = items["properties"].get("component", {})
             all_components = comp_wrapper.get("properties", {})
     except Exception:
-      logging.warning("Failed to extract component ref fields from v0.8 schema")
+      logger.warning("Failed to extract component ref fields from v0.8 schema")
 
     # Also check catalog schema if available
     if not all_components and catalog.catalog_schema:
