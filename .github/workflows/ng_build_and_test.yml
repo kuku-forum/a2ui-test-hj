@@ -17,11 +17,15 @@ name: Angular build and test
 on:
   push:
     branches: [ main ]
-    paths-ignore:
-      - 'samples/agent/adk/**'
+    paths:
+      - 'renderers/angular/**'
+      - 'renderers/web_core/**'
+      - 'samples/client/angular/**'
   pull_request:
-    paths-ignore:
-      - 'samples/agent/adk/**'
+    paths:
+      - 'renderers/angular/**'
+      - 'renderers/web_core/**'
+      - 'samples/client/angular/**'
 
 jobs:
   build-and-test:

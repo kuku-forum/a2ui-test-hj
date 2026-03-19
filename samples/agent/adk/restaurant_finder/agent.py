@@ -132,7 +132,7 @@ class RestaurantAgent:
     - UI 모드면 스키마/예제를 포함한 system prompt를 사용한다.
     - 텍스트 모드면 간단 프롬프트(`get_text_prompt`)를 사용한다.
     """
-    LITELLM_MODEL = os.getenv("LITELLM_MODEL", "openai/gpt-5.4")
+    LITELLM_MODEL = os.getenv("LITELLM_MODEL", "openai/gpt-4o-mini")
 
     instruction = (
         self._schema_manager.generate_system_prompt(
@@ -186,7 +186,9 @@ class RestaurantAgent:
     current_query_text = query
 
     # 스키마가 준비되지 않았으면 UI 응답을 안전하게 검증할 수 없으므로 에러 텍스트를 반환한다.
-    selected_catalog = self._schema_manager.get_selected_catalog()
+    selected_catalog = None
+    if self.use_ui:
+      selected_catalog = self._schema_manager.get_selected_catalog()
     if self.use_ui and not selected_catalog.catalog_schema:
       logger.error(
           "--- RestaurantAgent.stream: A2UI_SCHEMA is not loaded. "

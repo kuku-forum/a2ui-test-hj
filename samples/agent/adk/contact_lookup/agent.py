@@ -165,7 +165,9 @@ class ContactAgent:
     current_query_text = query
 
     # Ensure catalog schema was loaded
-    selected_catalog = self._schema_manager.get_selected_catalog()
+    selected_catalog = None
+    if self.use_ui:
+      selected_catalog = self._schema_manager.get_selected_catalog()
     if self.use_ui and not selected_catalog.catalog_schema:
       logger.error(
           "--- ContactAgent.stream: A2UI_SCHEMA is not loaded. "
