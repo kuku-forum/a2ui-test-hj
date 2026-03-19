@@ -16,6 +16,9 @@ site/
 # Python virtual environment
 .venv/
 
+# 실행 로그
+demos/logs/
+
 # Generated spec assets in the agent SDK
 ## old agent SDK path
 a2a_agents/python/a2ui_agent/src/a2ui/assets/**/*.json

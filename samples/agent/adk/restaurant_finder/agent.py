@@ -210,8 +210,13 @@ class RestaurantAgent:
     while attempt <= max_retries:
       attempt += 1
       logger.info(
-          f"--- RestaurantAgent.stream: Attempt {attempt}/{max_retries + 1} "
-          f"for session {session_id} ---"
+          f"━━ Attempt {attempt}/{max_retries + 1} | session={session_id[:8]}…"
+      )
+
+      # [QUERY] 사용자 → LLM 으로 전달되는 최종 쿼리
+      logger.info(
+          f"[QUERY] ▶ {current_query_text[:600]}"
+          + ("…" if len(current_query_text) > 600 else "")
       )
 
       # ADK runner에 전달할 사용자 메시지
@@ -225,15 +230,17 @@ class RestaurantAgent:
           session_id=session.id,
           new_message=current_message,
       ):
-        logger.info(f"Event from runner: {event}")
         if event.is_final_response():
           if event.content and event.content.parts and event.content.parts[0].text:
             final_response_content = "\n".join(
                 [p.text for p in event.content.parts if p.text]
             )
+            logger.info(
+                f"[RESPONSE] ◀ {final_response_content[:800]}"
+                + ("…" if len(final_response_content) > 800 else "")
+            )
           break
         else:
-          logger.info(f"Intermediate event: {event}")
           # 중간 이벤트는 사용자에게 "작업 중" 상태를 보여준다.
           yield {
               "is_task_complete": False,

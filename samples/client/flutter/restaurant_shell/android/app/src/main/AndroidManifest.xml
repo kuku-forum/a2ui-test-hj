@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 릴리즈/프로파일 모드에서 에이전트 HTTP 접속에 필요. debug/profile manifest 는 병합되지 않음 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="Restaurant Finder"
         android:name="${applicationName}"

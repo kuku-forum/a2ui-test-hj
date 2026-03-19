@@ -25,6 +25,11 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
 
+# genui/genui_a2ui 가 meta <1.18.0 을 요구하지만 meta 1.18.x 는 하위 호환.
+# override 없이 두면 "try flutter pub outdated" 경고가 뜨므로 강제 적용.
+dependency_overrides:
+  meta: ^1.18.0
+
 flutter:
   uses-material-design: true
   assets:
